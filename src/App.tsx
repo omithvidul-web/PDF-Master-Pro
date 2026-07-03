@@ -182,6 +182,17 @@ export default function App() {
   const [editorText, setEditorText] = useState('');
   const [lockSetupDoc, setLockSetupDoc] = useState<PDFDocument | null>(null);
   const [lockSetupPin, setLockSetupPin] = useState('');
+
+  // Image to PDF states
+  const [imageToPdfName, setImageToPdfName] = useState('My_Photo_Converted');
+  const [imageToPdfSelected, setImageToPdfSelected] = useState<string | null>(null);
+  const [imageToPdfLoading, setImageToPdfLoading] = useState(false);
+
+  // ID Card merger states
+  const [idCardFrontScanned, setIdCardFrontScanned] = useState(false);
+  const [idCardBackScanned, setIdCardBackScanned] = useState(false);
+  const [idCardName, setIdCardName] = useState('My_National_ID_Card');
+  const [idCardLoading, setIdCardLoading] = useState(false);
   
   // High-fidelity Settings states
   const [keepScreenOn, setKeepScreenOn] = useState<boolean>(() => localStorage.getItem('keep_screen_on') === 'true');
@@ -704,6 +715,266 @@ export default function App() {
       setOcrImage('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABBA==');
       setOcrDocName('Q2_Executive_Executive_Report');
       triggerNotification('Loaded Executive summary page scan.');
+    }
+  };
+
+  // Run conversion for Image to PDF tool
+  const runImageToPdfConvert = async () => {
+    if (!imageToPdfSelected) {
+      triggerNotification('📷 Please select or upload an image first.');
+      return;
+    }
+    setImageToPdfLoading(true);
+    try {
+      const docName = imageToPdfName.trim().endsWith('.pdf') ? imageToPdfName.trim() : `${imageToPdfName.trim()}.pdf`;
+      const res = await fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          document: {
+            name: docName,
+            size: '412 KB',
+            pages: [
+              {
+                pageNumber: 1,
+                content: `=== IMAGE CONVERTED TO PDF ===\nSource Image File: ${imageToPdfSelected}\nGenerated Date: ${new Date().toLocaleDateString()}\n\n[Raster Image Data Compiled successfully inside standard PDF page container. Coordinates, colors, and EXIF attributes preserved.]`
+              }
+            ],
+            bookmarkCount: 0,
+            isBookmarked: false
+          }
+        })
+      });
+      const data = await res.json();
+      setDocuments(data.documents);
+      triggerNotification(`🎉 Image successfully converted to PDF: "${docName}"!`);
+      setImageToPdfSelected(null);
+      setActiveTool(null);
+      setActiveTab('all_files');
+    } catch (err) {
+      triggerNotification('❌ Image conversion failed.');
+    } finally {
+      setImageToPdfLoading(false);
+    }
+  };
+
+  // Run dynamic compilation for Front & Back ID Card Merge
+  const runIdCardMerge = async () => {
+    if (!idCardFrontScanned || !idCardBackScanned) {
+      triggerNotification('🪪 Please scan or capture both front and back sides.');
+      return;
+    }
+    setIdCardLoading(true);
+    try {
+      const docName = idCardName.trim().endsWith('.pdf') ? idCardName.trim() : `${idCardName.trim()}.pdf`;
+      const res = await fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          document: {
+            name: docName,
+            size: '520 KB',
+            pages: [
+              {
+                pageNumber: 1,
+                content: `=== MERGED DUAL-SIDE ID CARD SCAN ===\nDocument ID Name: ${idCardName}\n\n=========================================\n[ FRONT SIDE - NATIONAL IDENTITY CARD ]\nHolder Photo & Hologram Verified.\nSerial: ID-88294-A2\n=========================================\n\n=========================================\n[ BACK SIDE - CODES & CHIP DETAILS ]\nMagnetic Strip Hash Code: 0x94EF29CA\nIssuer: Government Authority Dept\n=========================================\n\n[🛡️ SECURITY WATERMARK: PDF MASTER PRO ORIGINAL SECURE ID SCAN]`
+              }
+            ],
+            bookmarkCount: 0,
+            isBookmarked: false
+          }
+        })
+      });
+      const data = await res.json();
+      setDocuments(data.documents);
+      triggerNotification(`🎉 ID Card Front & Back successfully compiled to PDF: "${docName}"!`);
+      setIdCardFrontScanned(false);
+      setIdCardBackScanned(false);
+      setActiveTool(null);
+      setActiveTab('all_files');
+    } catch (err) {
+      triggerNotification('❌ ID Card compilation failed.');
+    } finally {
+      setIdCardLoading(false);
+    }
+  };
+
+  // Word to PDF converter
+  const runWordToPdf = async (doc: PDFDocument) => {
+    const baseName = doc.name.replace(/\.[^/.]+$/, "");
+    const pdfName = `${baseName}_converted.pdf`;
+    
+    try {
+      const res = await fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          document: {
+            name: pdfName,
+            size: '650 KB',
+            pages: doc.pages.map(p => ({
+              pageNumber: p.pageNumber,
+              content: `=== CONVERTED FROM WORD (.docx) ===\n${p.content}`
+            })),
+            bookmarkCount: 0,
+            isBookmarked: false
+          }
+        })
+      });
+      const data = await res.json();
+      setDocuments(data.documents);
+      triggerNotification(`🎉 "${doc.name}" converted to standard PDF: "${pdfName}"!`);
+      setActiveTool(null);
+      setActiveTab('all_files');
+    } catch (err) {
+      triggerNotification('❌ Word to PDF conversion failed.');
+    }
+  };
+
+  // PDF to Word converter
+  const runPdfToWord = async (doc: PDFDocument) => {
+    const baseName = doc.name.replace(/\.[^/.]+$/, "");
+    const docxName = `${baseName}_reflow.docx`;
+    
+    try {
+      const res = await fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          document: {
+            name: docxName,
+            size: '1.1 MB',
+            isWord: true,
+            pages: doc.pages.map(p => ({
+              pageNumber: p.pageNumber,
+              content: `=== Microsoft Word Document (.docx) ===\n[Reflowed Layout from PDF Source]\n\n${p.content}`
+            })),
+            bookmarkCount: 0,
+            isBookmarked: false
+          }
+        })
+      });
+      const data = await res.json();
+      setDocuments(data.documents);
+      triggerNotification(`🎉 "${doc.name}" successfully reflowed to Word document: "${docxName}"!`);
+      setActiveTool(null);
+      setActiveTab('all_files');
+    } catch (err) {
+      triggerNotification('❌ PDF to Word conversion failed.');
+    }
+  };
+
+  // PDF to Image
+  const runPdfToImage = async (doc: PDFDocument) => {
+    const baseName = doc.name.replace(/\.[^/.]+$/, "");
+    const imgName = `${baseName}_Page_1.png`;
+    
+    try {
+      const res = await fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          document: {
+            name: imgName,
+            size: '350 KB',
+            pages: [
+              {
+                pageNumber: 1,
+                content: `=== PNG IMAGE RASTER (Page 1) ===\nSource PDF: ${doc.name}\n\n[All text and layouts successfully rasterized into lossless pixel grid at 300 DPI resolution.]`
+              }
+            ],
+            bookmarkCount: 0,
+            isBookmarked: false
+          }
+        })
+      });
+      const data = await res.json();
+      setDocuments(data.documents);
+      triggerNotification(`🎉 Exported Page 1 of "${doc.name}" as Image: "${imgName}"!`);
+      setActiveTool(null);
+      setActiveTab('all_files');
+    } catch (err) {
+      triggerNotification('❌ PDF to Image conversion failed.');
+    }
+  };
+
+  // PDF to Long Image
+  const runPdfToLongImage = async (doc: PDFDocument) => {
+    const baseName = doc.name.replace(/\.[^/.]+$/, "");
+    const imgName = `${baseName}_Stitched_LongImage.jpg`;
+    
+    try {
+      const res = await fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          document: {
+            name: imgName,
+            size: '1.4 MB',
+            pages: [
+              {
+                pageNumber: 1,
+                content: `=== STITCHED LONG VERTICAL IMAGE ===\nSource PDF: ${doc.name}\n\n[Merged ${doc.pages.length} pages vertically into a seamless single JPEG image map for web presentation and offline backup.]`
+              }
+            ],
+            bookmarkCount: 0,
+            isBookmarked: false
+          }
+        })
+      });
+      const data = await res.json();
+      setDocuments(data.documents);
+      triggerNotification(`🎉 Stitched all pages of "${doc.name}" into single Long Image: "${imgName}"!`);
+      setActiveTool(null);
+      setActiveTab('all_files');
+    } catch (err) {
+      triggerNotification('❌ Long Image conversion failed.');
+    }
+  };
+
+  // Split PDF
+  const runSplitPdf = async (doc: PDFDocument) => {
+    if (doc.pages.length < 2) {
+      triggerNotification(`ℹ️ Document "${doc.name}" is already a single page document.`);
+      return;
+    }
+    const baseName = doc.name.replace(/\.[^/.]+$/, "");
+    
+    try {
+      // Create new files for each page
+      for (let i = 0; i < doc.pages.length; i++) {
+        const pageNum = i + 1;
+        const childName = `${baseName}_Page_${pageNum}.pdf`;
+        await fetch('/api/documents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            document: {
+              name: childName,
+              size: '120 KB',
+              pages: [
+                {
+                  pageNumber: 1,
+                  content: `=== SPLIT PAGE ${pageNum} OF ${doc.pages.length} ===\nSource File: ${doc.name}\n\n${doc.pages[i].content}`
+                }
+              ],
+              bookmarkCount: 0,
+              isBookmarked: false
+            }
+          })
+        });
+      }
+      
+      // Fetch refreshed documents list
+      const getRes = await fetch('/api/documents');
+      const documentsData = await getRes.json();
+      setDocuments(documentsData);
+      
+      triggerNotification(`🎉 Successfully split "${doc.name}" into ${doc.pages.length} single-page PDF files!`);
+      setActiveTool(null);
+      setActiveTab('all_files');
+    } catch (err) {
+      triggerNotification('❌ Split PDF process failed.');
     }
   };
 
@@ -1895,11 +2166,20 @@ export default function App() {
         {/* INTERACTIVE FULL SCREEN TOOL OVERLAYS    */}
         {/* ======================================= */}
         {activeTool && (
-          <div className="absolute inset-0 bg-[#121212] flex flex-col z-30 animate-slide-up">
+          <div className={`absolute inset-0 flex flex-col z-30 animate-slide-up transition-colors duration-300 ${
+            themeMode === 'dark' ? 'bg-[#121212] text-white' : 'bg-[#f8f9fa] text-slate-800'
+          }`}>
             
             {/* Header bar */}
-            <div className="px-4 py-3.5 border-b border-[#222222] bg-[#1a1a1a] flex items-center gap-3">
-              <button onClick={() => setActiveTool(null)} className="p-1.5 rounded-xl bg-[#252525] text-white">
+            <div className={`px-4 py-3.5 border-b flex items-center gap-3 ${
+              themeMode === 'dark' ? 'border-[#222222] bg-[#1a1a1a] text-white' : 'border-slate-200 bg-white text-slate-800'
+            }`}>
+              <button 
+                onClick={() => setActiveTool(null)} 
+                className={`p-1.5 rounded-xl transition-colors ${
+                  themeMode === 'dark' ? 'bg-[#252525] text-white hover:bg-[#353535]' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
                 <ArrowLeft className="w-4 h-4" />
               </button>
               <h2 className="text-sm font-bold tracking-tight capitalize">{activeTool.replace(/_/g, ' ')}</h2>
@@ -1912,7 +2192,7 @@ export default function App() {
                 <div className="space-y-4">
                   <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl space-y-2">
                     <span className="text-xs font-bold text-emerald-400 block">Gemini OCR Engine</span>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                    <p className={`text-[11px] leading-relaxed ${themeMode === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                       Extract perfectly aligned text from screenshots or reports via server-side Gemini intelligence.
                     </p>
                   </div>
@@ -1920,21 +2200,39 @@ export default function App() {
                   <div className="space-y-1">
                     <span className="text-[10px] font-black tracking-widest text-slate-500 uppercase">Scanner Targets</span>
                     <div className="grid grid-cols-2 gap-2">
-                      <button onClick={() => loadOcrSample('receipt')} className="p-2.5 rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] text-left">
-                        <span className="text-xs font-bold block text-white">Coffee Bill Scan</span>
+                      <button 
+                        onClick={() => loadOcrSample('receipt')} 
+                        className={`p-2.5 rounded-xl border text-left transition-colors ${
+                          themeMode === 'dark' ? 'border-[#2a2a2a] bg-[#1a1a1a]' : 'border-slate-200 bg-white hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className={`text-xs font-bold block ${themeMode === 'dark' ? 'text-white' : 'text-slate-800'}`}>Coffee Bill Scan</span>
                         <span className="text-[9px] text-slate-500">Retail metadata</span>
                       </button>
-                      <button onClick={() => loadOcrSample('report')} className="p-2.5 rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] text-left">
-                        <span className="text-xs font-bold block text-white">Corporate Statement</span>
+                      <button 
+                        onClick={() => loadOcrSample('report')} 
+                        className={`p-2.5 rounded-xl border text-left transition-colors ${
+                          themeMode === 'dark' ? 'border-[#2a2a2a] bg-[#1a1a1a]' : 'border-slate-200 bg-white hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className={`text-xs font-bold block ${themeMode === 'dark' ? 'text-white' : 'text-slate-800'}`}>Corporate Statement</span>
                         <span className="text-[9px] text-slate-500">Table layouts</span>
                       </button>
                     </div>
                   </div>
 
                   {ocrImage && (
-                    <div className="p-3 bg-[#181818] border border-[#222222] rounded-xl flex items-center justify-between">
-                      <span className="text-xs text-slate-300">Target: <strong className="text-rose-500">{ocrDocName}</strong></span>
-                      <select value={ocrLanguage} onChange={e => setOcrLanguage(e.target.value)} className="bg-[#252525] text-[10px] font-bold p-1 rounded">
+                    <div className={`p-3 border rounded-xl flex items-center justify-between ${
+                      themeMode === 'dark' ? 'bg-[#181818] border-[#222222]' : 'bg-white border-slate-200 shadow-sm'
+                    }`}>
+                      <span className={`text-xs ${themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Target: <strong className="text-rose-500">{ocrDocName}</strong></span>
+                      <select 
+                        value={ocrLanguage} 
+                        onChange={e => setOcrLanguage(e.target.value)} 
+                        className={`text-[10px] font-bold p-1 rounded outline-none ${
+                          themeMode === 'dark' ? 'bg-[#252525] text-white' : 'bg-slate-100 text-slate-800'
+                        }`}
+                      >
                         <option value="English">English</option>
                         <option value="Sinhala">Sinhala</option>
                         <option value="Spanish">Spanish</option>
@@ -1945,22 +2243,38 @@ export default function App() {
                   <button 
                     disabled={ocrLoading} 
                     onClick={processOCR}
-                    className="w-full py-3 bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {ocrLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                     <span>{ocrLoading ? 'Extracting via Gemini API...' : 'Run Server-Side OCR'}</span>
                   </button>
 
                   {ocrResult && (
-                    <div className="p-4 bg-[#0a0a0a] rounded-2xl border border-[#222222] space-y-2">
-                      <div className="flex justify-between items-center border-b border-[#222222] pb-2">
+                    <div className={`p-4 rounded-2xl border space-y-2 ${
+                      themeMode === 'dark' ? 'bg-[#0a0a0a] border-[#222222]' : 'bg-white border-slate-200 shadow-sm'
+                    }`}>
+                      <div className={`flex justify-between items-center border-b pb-2 ${themeMode === 'dark' ? 'border-[#222222]' : 'border-slate-100'}`}>
                         <span className="text-[9px] font-black tracking-widest text-emerald-400 uppercase">OCR Text</span>
-                        <button onClick={() => {
-                          navigator.clipboard.writeText(ocrResult);
-                          triggerNotification('📋 Extracted text copied!');
-                        }} className="text-[9px] bg-[#1a1a1a] px-2 py-0.5 rounded">Copy</button>
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(ocrResult);
+                            triggerNotification('📋 Extracted text copied!');
+                          }} 
+                          className={`text-[9px] px-2 py-0.5 rounded ${
+                            themeMode === 'dark' ? 'bg-[#1a1a1a] text-slate-300' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          Copy
+                        </button>
                       </div>
-                      <textarea value={ocrResult} onChange={e => setOcrResult(e.target.value)} rows={6} className="w-full bg-transparent text-xs font-mono text-slate-300 resize-none outline-none border-none leading-relaxed" />
+                      <textarea 
+                        value={ocrResult} 
+                        onChange={e => setOcrResult(e.target.value)} 
+                        rows={6} 
+                        className={`w-full bg-transparent text-xs font-mono resize-none outline-none border-none leading-relaxed ${
+                          themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                        }`} 
+                      />
                     </div>
                   )}
                 </div>
@@ -1971,24 +2285,26 @@ export default function App() {
                 <div className="space-y-4 text-center">
                   <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-left">
                     <span className="text-xs font-bold text-blue-400 block">Simulated Smart Lens Scanner</span>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                    <p className={`text-[11px] leading-relaxed ${themeMode === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                       Auto-detect document boundaries and shadows inside your viewport camera grid.
                     </p>
                   </div>
 
-                  <div className="aspect-[3/4] max-w-xs mx-auto bg-[#1a1a1a] rounded-2xl border-2 border-dashed border-[#333333] relative overflow-hidden flex flex-col items-center justify-center">
+                  <div className={`aspect-[3/4] max-w-xs mx-auto rounded-2xl border-2 border-dashed relative overflow-hidden flex flex-col items-center justify-center ${
+                    themeMode === 'dark' ? 'bg-[#1a1a1a] border-[#333333]' : 'bg-white border-slate-300 shadow-sm'
+                  }`}>
                     {scanStage === 'preview' ? (
                       <>
                         <div className="absolute inset-4 border border-rose-500/40 rounded-xl" />
                         <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-rose-500/60 animate-bounce" />
                         <Camera className="w-12 h-12 text-slate-600 mb-2 animate-pulse" />
                         <span className="text-[10px] text-slate-500">Position document inside grid</span>
-                        <button onClick={triggerCameraCapture} className="absolute bottom-6 w-12 h-12 bg-rose-600 rounded-full border-4 border-white flex items-center justify-center shadow-lg" />
+                        <button onClick={triggerCameraCapture} className="absolute bottom-6 w-12 h-12 bg-rose-600 rounded-full border-4 border-white flex items-center justify-center shadow-lg cursor-pointer" />
                       </>
                     ) : (
                       <div className="flex flex-col items-center">
                         <RefreshCw className="w-10 h-10 text-rose-500 animate-spin mb-2" />
-                        <span className="text-xs font-bold">Cropping & Aligning page...</span>
+                        <span className={`text-xs font-bold ${themeMode === 'dark' ? 'text-white' : 'text-slate-800'}`}>Cropping & Aligning page...</span>
                       </div>
                     )}
                   </div>
@@ -2004,7 +2320,9 @@ export default function App() {
                       type="text" 
                       value={convTitle} 
                       onChange={e => setConvTitle(e.target.value)} 
-                      className="w-full p-2.5 bg-[#181818] border border-[#282828] rounded-xl text-xs"
+                      className={`w-full p-2.5 rounded-xl text-xs outline-none transition-colors ${
+                        themeMode === 'dark' ? 'bg-[#181818] border border-[#282828] text-white focus:border-rose-500' : 'bg-white border border-slate-200 text-slate-800 focus:border-rose-500'
+                      }`}
                     />
                   </div>
                   <div className="space-y-1">
@@ -2014,16 +2332,174 @@ export default function App() {
                       onChange={e => setConvText(e.target.value)} 
                       rows={8} 
                       placeholder="Type rich paragraph layout blocks..."
-                      className="w-full p-2.5 bg-[#181818] border border-[#282828] rounded-xl text-xs font-mono"
+                      className={`w-full p-2.5 rounded-xl text-xs font-mono outline-none transition-colors ${
+                        themeMode === 'dark' ? 'bg-[#181818] border border-[#282828] text-white focus:border-rose-500' : 'bg-white border border-slate-200 text-slate-800 focus:border-rose-500'
+                      }`}
                     />
                   </div>
                   <button 
                     disabled={convLoading} 
                     onClick={compileTextToPDF}
-                    className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {convLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                     <span>Compile & Save to Cloud</span>
+                  </button>
+                </div>
+              )}
+
+              {/* IMAGE TO PDF COVERT SYSTEM */}
+              {activeTool === 'image_to_pdf' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl">
+                    <span className="text-xs font-bold text-rose-400 block">Raster Image to Vector PDF Compiler</span>
+                    <p className={`text-[11px] leading-relaxed mt-1 ${themeMode === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Choose an image asset below to wrap inside a high-contrast container block.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black tracking-widest text-slate-500 uppercase">Select Source Image</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'scanned_receipt.jpg', title: 'Receipt' },
+                        { id: 'driving_license.png', title: 'Driver ID' },
+                        { id: 'handwritten_memo.jpg', title: 'Memo' }
+                      ].map(img => {
+                        const isSel = imageToPdfSelected === img.id;
+                        return (
+                          <button
+                            key={img.id}
+                            onClick={() => {
+                              setImageToPdfSelected(img.id);
+                              triggerNotification(`📷 Selected image source: ${img.title}`);
+                            }}
+                            className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                              isSel 
+                                ? 'bg-rose-600/25 border-rose-500 text-rose-500 font-bold' 
+                                : themeMode === 'dark'
+                                ? 'bg-[#181818] border-[#252525] text-slate-400 hover:text-white'
+                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-rose-400'
+                            }`}
+                          >
+                            <FileImage className="w-5 h-5 mx-auto mb-1 text-rose-400" />
+                            <span className="text-[10px] font-bold block">{img.title}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black tracking-widest text-slate-500 uppercase">Output PDF Filename</span>
+                    <input 
+                      type="text" 
+                      value={imageToPdfName} 
+                      onChange={e => setImageToPdfName(e.target.value)} 
+                      className={`w-full p-2.5 rounded-xl text-xs outline-none transition-colors ${
+                        themeMode === 'dark' ? 'bg-[#181818] border border-[#282828] text-white focus:border-rose-500' : 'bg-white border border-slate-200 text-slate-800 focus:border-rose-500'
+                      }`}
+                    />
+                  </div>
+
+                  <button
+                    disabled={imageToPdfLoading}
+                    onClick={runImageToPdfConvert}
+                    className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {imageToPdfLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    <span>Compile Image to PDF</span>
+                  </button>
+                </div>
+              )}
+
+              {/* ID CARD DUAL-SIDE COMPILING SYSTEM */}
+              {activeTool === 'id_card' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+                    <span className="text-xs font-bold text-amber-400 block">Smart Dual-Side ID Card Assembly</span>
+                    <p className={`text-[11px] leading-relaxed mt-1 ${themeMode === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Assemble the Front and Back images of any certificate or license card into a neat 1-page PDF.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Front side */}
+                    <button
+                      onClick={() => {
+                        setIdCardFrontScanned(true);
+                        triggerNotification('🪪 ID Front scanned & cropped successfully!');
+                      }}
+                      className={`p-4 rounded-2xl border text-center relative flex flex-col items-center justify-center h-28 transition-all cursor-pointer ${
+                        idCardFrontScanned 
+                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-500' 
+                          : themeMode === 'dark'
+                          ? 'bg-[#181818] border-[#252525] text-slate-300'
+                          : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-amber-400 text-slate-700 shadow-sm'
+                      }`}
+                    >
+                      {idCardFrontScanned ? (
+                        <>
+                          <CheckCircle className="w-8 h-8 text-emerald-500 mb-1" />
+                          <span className={`text-[10px] font-bold ${themeMode === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>Front Loaded</span>
+                        </>
+                      ) : (
+                        <>
+                          <Crop className="w-8 h-8 text-amber-400 mb-1" />
+                          <span className={`text-[10px] font-bold ${themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Scan Card Front</span>
+                          <span className="text-[8px] text-slate-500 mt-1">Simulate capture</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Back side */}
+                    <button
+                      onClick={() => {
+                        setIdCardBackScanned(true);
+                        triggerNotification('🪪 ID Back scanned & encrypted successfully!');
+                      }}
+                      className={`p-4 rounded-2xl border text-center relative flex flex-col items-center justify-center h-28 transition-all cursor-pointer ${
+                        idCardBackScanned 
+                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-500' 
+                          : themeMode === 'dark'
+                          ? 'bg-[#181818] border-[#252525] text-slate-300'
+                          : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-amber-400 text-slate-700 shadow-sm'
+                      }`}
+                    >
+                      {idCardBackScanned ? (
+                        <>
+                          <CheckCircle className="w-8 h-8 text-emerald-500 mb-1" />
+                          <span className={`text-[10px] font-bold ${themeMode === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>Back Loaded</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sliders className="w-8 h-8 text-amber-400 mb-1" />
+                          <span className={`text-[10px] font-bold ${themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Scan Card Back</span>
+                          <span className="text-[8px] text-slate-500 mt-1">Simulate capture</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black tracking-widest text-slate-500 uppercase">Document Name</span>
+                    <input 
+                      type="text" 
+                      value={idCardName} 
+                      onChange={e => setIdCardName(e.target.value)} 
+                      className={`w-full p-2.5 rounded-xl text-xs outline-none transition-colors ${
+                        themeMode === 'dark' ? 'bg-[#181818] border border-[#282828] text-white focus:border-rose-500' : 'bg-white border border-slate-200 text-slate-800 focus:border-rose-500'
+                      }`}
+                    />
+                  </div>
+
+                  <button
+                    disabled={idCardLoading}
+                    onClick={runIdCardMerge}
+                    className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {idCardLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
+                    <span>Compile Dual-Side Card PDF</span>
                   </button>
                 </div>
               )}
@@ -2033,7 +2509,14 @@ export default function App() {
                 <div className="space-y-4">
                   <div className="space-y-1.5">
                     <span className="text-[10px] font-black tracking-widest text-slate-500 uppercase">Merged Document Name</span>
-                    <input type="text" value={mergeTitle} onChange={e => setMergeTitle(e.target.value)} className="w-full p-2.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl text-xs" />
+                    <input 
+                      type="text" 
+                      value={mergeTitle} 
+                      onChange={e => setMergeTitle(e.target.value)} 
+                      className={`w-full p-2.5 rounded-xl text-xs outline-none transition-colors ${
+                        themeMode === 'dark' ? 'bg-[#1a1a1a] border border-[#2a2a2a] text-white focus:border-rose-500' : 'bg-white border border-slate-200 text-slate-800 focus:border-rose-500'
+                      }`}
+                    />
                   </div>
                   <div className="space-y-2">
                     <span className="text-[10px] font-black tracking-widest text-slate-500 uppercase block">Select Files to Join</span>
@@ -2047,11 +2530,15 @@ export default function App() {
                             else setSelectedMergeDocs(prev => [...prev, doc.id]);
                           }}
                           className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                            checked ? 'bg-rose-500/10 border-rose-500/40' : 'bg-[#181818] border-[#222222]'
+                            checked 
+                              ? 'bg-rose-500/10 border-rose-500/40 text-rose-500 font-semibold' 
+                              : themeMode === 'dark'
+                              ? 'bg-[#181818] border-[#222222] text-slate-200'
+                              : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50 shadow-sm'
                           }`}
                         >
                           <span className="text-xs font-bold">{doc.name}</span>
-                          <span className="text-[10px] text-slate-500">{doc.pages.length} pgs</span>
+                          <span className={`text-[10px] ${themeMode === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{doc.pages.length} pgs</span>
                         </div>
                       );
                     })}
@@ -2059,7 +2546,7 @@ export default function App() {
                   <button 
                     disabled={selectedMergeDocs.length < 2 || convLoading} 
                     onClick={mergeSelectedFiles}
-                    className="w-full py-3.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2"
+                    className="w-full py-3.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <ArrowLeftRight className="w-4 h-4" />
                     <span>Merge Selected ({selectedMergeDocs.length})</span>
@@ -2070,7 +2557,7 @@ export default function App() {
               {/* COMPRESS, EDIT TEXT, SIGN, LOCK, UNLOCK Target Selectors */}
               {['compress', 'edit_text', 'sign', 'lock_pdf', 'unlock_pdf', 'print', 'pdf_to_word', 'pdf_to_image', 'pdf_to_long_image', 'word_to_pdf', 'annotate', 'add_text', 'split'].includes(activeTool) && (
                 <div className="space-y-4">
-                  <p className="text-xs text-slate-400">Select which document to apply this action tool on:</p>
+                  <p className={`text-xs ${themeMode === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Select which document to apply this action tool on:</p>
                   <div className="space-y-2">
                     {documents.map(doc => (
                       <div
@@ -2088,15 +2575,40 @@ export default function App() {
                           } else if (activeTool === 'print') {
                             triggerNotification('🖨️ Opening browser printing simulator...');
                             setTimeout(() => window.print(), 800);
+                          } else if (activeTool === 'word_to_pdf') {
+                            runWordToPdf(doc);
+                          } else if (activeTool === 'pdf_to_word') {
+                            runPdfToWord(doc);
+                          } else if (activeTool === 'pdf_to_image') {
+                            runPdfToImage(doc);
+                          } else if (activeTool === 'pdf_to_long_image') {
+                            runPdfToLongImage(doc);
+                          } else if (activeTool === 'split') {
+                            runSplitPdf(doc);
+                          } else if (activeTool === 'annotate') {
+                            setActiveTool(null);
+                            openReader(doc);
+                            setTimeout(() => {
+                              const quickNote = prompt(`Attach annotation memo to page 1:`, '');
+                              if (quickNote !== null) {
+                                setNoteInput(quickNote);
+                                setReaderNotes(prev => ({ ...prev, [`${doc.id}-1`]: quickNote }));
+                                triggerNotification(`💾 Saved annotation to page 1`);
+                              }
+                            }, 500);
                           } else {
                             // general mock successes
                             triggerNotification(`✨ Successfully processed "${activeTool.replace(/_/g, ' ')}" on ${doc.name}!`);
                             setActiveTool(null);
                           }
                         }}
-                        className="p-3 bg-[#181818] border border-[#222222] hover:bg-[#252525] rounded-xl flex items-center justify-between cursor-pointer transition-colors"
+                        className={`p-3 border rounded-xl flex items-center justify-between cursor-pointer transition-colors ${
+                          themeMode === 'dark'
+                            ? 'bg-[#181818] border-[#222222] hover:bg-[#252525] text-slate-200'
+                            : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-800 shadow-sm'
+                        }`}
                       >
-                        <span className="text-xs font-bold text-slate-200">{doc.name}</span>
+                        <span className={`text-xs font-bold ${themeMode === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>{doc.name}</span>
                         <ChevronRight className="w-4 h-4 text-slate-500" />
                       </div>
                     ))}
@@ -2112,21 +2624,29 @@ export default function App() {
         {/* VIEW C: PDF READERVIEW SCREEN           */}
         {/* ======================================= */}
         {currentScreen === 'reader' && selectedDoc && (
-          <div className="absolute inset-0 bg-[#121212] flex flex-col z-30 animate-fade-in select-none">
+          <div className={`absolute inset-0 flex flex-col z-30 animate-fade-in select-none transition-colors duration-300 ${
+            themeMode === 'dark' ? 'bg-[#121212] text-white' : 'bg-[#f8f9fa] text-slate-800'
+          }`}>
             {/* 📱 Premium Top Header Action Bar (Exactly like screenshot) */}
-            <div className="px-4 py-3 bg-[#0d0d0d] border-b border-[#1f1f1f] flex items-center justify-between text-white">
+            <div className={`px-4 py-3 border-b flex items-center justify-between transition-colors duration-300 ${
+              themeMode === 'dark' ? 'bg-[#0d0d0d] border-[#1f1f1f] text-white' : 'bg-white border-slate-200 text-slate-800'
+            }`}>
               {/* Back Arrow */}
               <button 
                 id="reader-back-btn"
                 onClick={() => { stopTTS(); setCurrentScreen('app'); }} 
-                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-200 transition-colors cursor-pointer"
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-700'
+                }`}
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
 
               {/* Minimalist Title */}
               <div className="flex-1 min-w-0 mx-3">
-                <p className="text-[11px] font-bold text-slate-300 truncate tracking-wide uppercase font-mono">
+                <p className={`text-[11px] font-bold truncate tracking-wide uppercase font-mono ${
+                  themeMode === 'dark' ? 'text-slate-300' : 'text-slate-600'
+                }`}>
                   {selectedDoc.name.replace('.pdf', '').replace('.docx', '').replace('.pptx', '')}
                 </p>
               </div>
@@ -2140,9 +2660,9 @@ export default function App() {
                     setReaderPaperTint(nextTint);
                     triggerNotification(`🎨 Set page paper contrast tint: ${nextTint.toUpperCase()}`);
                   }}
-                  className={`p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition-colors relative ${
-                    readerPaperTint !== 'white' ? 'text-amber-400' : ''
-                  }`}
+                  className={`p-1.5 rounded-lg transition-colors relative ${
+                    themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
+                  } ${readerPaperTint !== 'white' ? 'text-amber-500' : ''}`}
                   title="Page Paper Color Tint"
                 >
                   <Droplet className="w-4 h-4" />
@@ -2155,7 +2675,11 @@ export default function App() {
                     setReaderZoom(nextZoom);
                     triggerNotification(`🔍 Text reflow adjusted: ${nextZoom}% scale`);
                   }}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition-colors font-bold font-serif text-xs border border-slate-700 w-6 h-6 flex items-center justify-center rounded-md bg-slate-900"
+                  className={`p-1.5 transition-colors font-bold font-serif text-xs border w-6 h-6 flex items-center justify-center rounded-md ${
+                    themeMode === 'dark' 
+                      ? 'hover:bg-slate-800 text-slate-300 border-slate-700 bg-slate-900' 
+                      : 'hover:bg-slate-100 text-slate-700 border-slate-300 bg-slate-100'
+                  }`}
                   title="Reflow Mode"
                 >
                   W
@@ -2164,7 +2688,11 @@ export default function App() {
                 {/* 3. Search glass icon */}
                 <button 
                   onClick={() => setShowSearchToolbar(prev => !prev)}
-                  className={`p-1.5 rounded-lg hover:bg-slate-800 transition-colors ${showSearchToolbar ? 'text-rose-500 bg-rose-500/10' : 'text-slate-300'}`}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    showSearchToolbar 
+                      ? 'text-rose-500 bg-rose-500/10' 
+                      : themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'
+                  }`}
                   title="Search text"
                 >
                   <Search className="w-4 h-4" />
@@ -2183,7 +2711,9 @@ export default function App() {
                       triggerNotification(`📤 Generated shareable secure download link for ${selectedDoc.name}!`);
                     }
                   }}
-                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition-colors"
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'
+                  }`}
                   title="Share Document"
                 >
                   <Share2 className="w-4 h-4" />
@@ -2192,7 +2722,9 @@ export default function App() {
                 {/* 5. Star Bookmark */}
                 <button 
                   onClick={() => toggleBookmark(selectedDoc)} 
-                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition-colors"
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'
+                  }`}
                   title="Bookmark Document"
                 >
                   <Star className={`w-4 h-4 ${selectedDoc.isBookmarked ? 'fill-yellow-400 text-yellow-400' : ''}`} />
@@ -2200,30 +2732,40 @@ export default function App() {
 
                 {/* 6. More vertical */}
                 <div className="relative group">
-                  <button className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition-colors">
+                  <button className={`p-1.5 rounded-lg transition-colors ${
+                    themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'
+                  }`}>
                     <MoreVertical className="w-4 h-4" />
                   </button>
-                  <div className="absolute right-0 top-8 w-40 bg-[#161616] border border-[#2a2a2a] rounded-xl shadow-2xl py-1 z-50 hidden group-hover:block text-[10px]">
+                  <div className={`absolute right-0 top-8 w-40 border rounded-xl shadow-2xl py-1 z-50 hidden group-hover:block text-[10px] ${
+                    themeMode === 'dark' ? 'bg-[#161616] border-[#2a2a2a]' : 'bg-white border-slate-200'
+                  }`}>
                     <button 
                       onClick={() => {
                         if (readerTTSActive) stopTTS();
                         else startTTS(selectedDoc.pages[readerPage - 1]?.content);
                       }}
-                      className="w-full text-left px-3 py-2 hover:bg-[#252525] flex items-center gap-2 text-slate-300"
+                      className={`w-full text-left px-3 py-2 flex items-center gap-2 ${
+                        themeMode === 'dark' ? 'hover:bg-[#252525] text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+                      }`}
                     >
                       <Volume2 className="w-3.5 h-3.5 text-rose-500" />
                       <span>{readerTTSActive ? 'Stop Voice Reader' : 'Read Page Aloud'}</span>
                     </button>
                     <button 
                       onClick={() => triggerNotification('🖨️ Initializing wireless print spooler...')}
-                      className="w-full text-left px-3 py-2 hover:bg-[#252525] flex items-center gap-2 text-slate-300"
+                      className={`w-full text-left px-3 py-2 flex items-center gap-2 ${
+                        themeMode === 'dark' ? 'hover:bg-[#252525] text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+                      }`}
                     >
                       <Printer className="w-3.5 h-3.5 text-slate-400" />
                       <span>Print Document</span>
                     </button>
                     <button 
                       onClick={() => triggerNotification('📥 Document saved to offline storage.')}
-                      className="w-full text-left px-3 py-2 hover:bg-[#252525] flex items-center gap-2 text-slate-300"
+                      className={`w-full text-left px-3 py-2 flex items-center gap-2 ${
+                        themeMode === 'dark' ? 'hover:bg-[#252525] text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+                      }`}
                     >
                       <Download className="w-3.5 h-3.5 text-slate-400" />
                       <span>Download Copy</span>
@@ -2235,7 +2777,9 @@ export default function App() {
 
             {/* Optional Collapsible Document Search Toolbar */}
             {showSearchToolbar && (
-              <div className="px-4 py-2.5 bg-[#141414] border-b border-[#222222] flex gap-2 animate-fade-in">
+              <div className={`px-4 py-2.5 border-b flex gap-2 animate-fade-in ${
+                themeMode === 'dark' ? 'bg-[#141414] border-[#222222]' : 'bg-slate-50 border-slate-200'
+              }`}>
                 <div className="relative flex-1">
                   <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-500" />
                   <input 
@@ -2243,28 +2787,36 @@ export default function App() {
                     placeholder="Search keywords inside document..." 
                     value={readerSearch} 
                     onChange={e => setReaderSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 bg-[#0a0a0a] border border-[#222222] rounded-lg text-[11px] text-white placeholder-slate-600 outline-none"
+                    className={`w-full pl-8 pr-3 py-1.5 rounded-lg text-[11px] outline-none ${
+                      themeMode === 'dark' 
+                        ? 'bg-[#0a0a0a] border border-[#222222] text-white placeholder-slate-600' 
+                        : 'bg-white border border-slate-200 text-slate-800 placeholder-slate-400 shadow-xs'
+                    }`}
                     autoFocus
                   />
                   {readerSearch && (
                     <button 
                       onClick={() => setReaderSearch('')}
-                      className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 text-[10px]"
+                      className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-700 text-[10px]"
                     >
                       Clear
                     </button>
                   )}
                 </div>
-                <div className="flex items-center gap-1.5 bg-black px-2 py-0.5 rounded-lg border border-[#222222]">
-                  <button onClick={() => setReaderZoom(prev => Math.max(50, prev - 25))} className="text-slate-400 hover:text-white font-bold px-1 text-xs">-</button>
+                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg border ${
+                  themeMode === 'dark' ? 'bg-black border-[#222222]' : 'bg-white border-slate-200'
+                }`}>
+                  <button onClick={() => setReaderZoom(prev => Math.max(50, prev - 25))} className="text-slate-400 hover:text-rose-500 font-bold px-1 text-xs cursor-pointer">-</button>
                   <span className="text-[10px] text-rose-500 font-bold font-mono">{readerZoom}%</span>
-                  <button onClick={() => setReaderZoom(prev => Math.min(200, prev + 25))} className="text-slate-400 hover:text-white font-bold px-1 text-xs">+</button>
+                  <button onClick={() => setReaderZoom(prev => Math.min(200, prev + 25))} className="text-slate-400 hover:text-rose-500 font-bold px-1 text-xs cursor-pointer">+</button>
                 </div>
               </div>
             )}
 
             {/* 📄 Immersive Document Canvas Area */}
-            <div className="flex-1 overflow-auto p-4 flex flex-col items-center justify-start relative bg-[#1c1c1c]">
+            <div className={`flex-1 overflow-auto p-4 flex flex-col items-center justify-start relative transition-colors duration-300 ${
+              themeMode === 'dark' ? 'bg-[#1c1c1c]' : 'bg-[#eef1f5]'
+            }`}>
               
               {/* Floating Translucent Page Indicator (Exactly like top-left 1/4 in screenshot) */}
               <div className="absolute top-4 left-4 px-2.5 py-1 rounded-md bg-black/65 text-[11px] font-bold text-white z-10 border border-white/5 shadow-md flex items-center gap-1 select-none">
