@@ -1,0 +1,6 @@
+{
+  "name": "PDF Master Pro",
+  "description": "Premium Document Management System: Read, edit, convert, OCR, and organize PDFs dynamically with dynamic navigation and custom ad placements.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
