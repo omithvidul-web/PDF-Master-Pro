@@ -4,6 +4,7 @@ import { ShieldCheck, Calendar, Star, Award, FileText } from 'lucide-react';
 interface ScannedDocumentPageProps {
   pageNumber: number;
   content: string;
+  imageBase64?: string;
   searchQuery: string;
   documentName: string;
   documentId: string;
@@ -12,6 +13,7 @@ interface ScannedDocumentPageProps {
 export const ScannedDocumentPage: React.FC<ScannedDocumentPageProps> = ({
   pageNumber,
   content,
+  imageBase64,
   searchQuery,
   documentName,
   documentId,
@@ -43,11 +45,22 @@ export const ScannedDocumentPage: React.FC<ScannedDocumentPageProps> = ({
     documentName.toLowerCase().includes('timetable');
 
   if (!isSouthernProvinceCircular) {
+    if (imageBase64) {
+      return (
+        <div 
+          id="default-scanned-page"
+          className="w-full h-full bg-white overflow-hidden font-sans relative flex items-center justify-center flex-1"
+        >
+          <img src={imageBase64} alt={`Page ${pageNumber}`} className="max-w-full max-h-full object-contain" referrerPolicy="no-referrer" />
+        </div>
+      );
+    }
+
     // Elegant default paper document layout for all other PDF/Word documents
     return (
       <div 
         id="default-scanned-page"
-        className="w-full bg-white text-slate-800 p-8 rounded-xl shadow-lg border border-slate-200 min-h-[480px] flex flex-col justify-between font-sans relative"
+        className="w-full h-full bg-white text-slate-800 p-8 flex flex-col justify-between font-sans relative flex-1"
       >
         {/* Subtle physical paper texture simulation */}
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px] rounded-xl" />
@@ -56,7 +69,7 @@ export const ScannedDocumentPage: React.FC<ScannedDocumentPageProps> = ({
           {/* Default Document Header */}
           <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
             <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-rose-500" />
+              <FileText className="w-5 h-5 text-red-500" />
               <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">PDF Master Secure Scan</span>
             </div>
             <span className="text-xs font-mono font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
@@ -89,7 +102,7 @@ export const ScannedDocumentPage: React.FC<ScannedDocumentPageProps> = ({
   return (
     <div 
       id="southern-province-circular-page"
-      className="w-full bg-[#f9f9fa] text-slate-800 p-6 md:p-8 rounded-xl shadow-lg border border-slate-200 min-h-[580px] flex flex-col justify-between relative font-sans overflow-hidden select-none"
+      className="w-full h-full bg-[#f9f9fa] text-slate-800 p-6 md:p-8 flex flex-col justify-between relative font-sans overflow-hidden select-none flex-1"
       style={{
         backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.94)), radial-gradient(#aaa 1px, transparent 1px)',
         backgroundSize: '100% 100%, 24px 24px',
@@ -179,7 +192,7 @@ export const ScannedDocumentPage: React.FC<ScannedDocumentPageProps> = ({
             </p>
 
             <p className="text-[10px] leading-relaxed text-slate-800 font-sans text-justify">
-              <span className="font-bold">02.</span> ඒ අනුව, 2026 වර්ෂයේ 12-13 ශ්‍රේණි සඳහා අවසන් වාර පරීක්ෂණය <span className="font-semibold text-rose-600 bg-rose-50 px-1 rounded">2026 ජූලි මස 01 දින</span> සිට <span className="font-semibold text-rose-600 bg-rose-50 px-1 rounded">ජූලි මස 22 දින</span> දක්වා සතියේ දින 16 ක දී පැවැත්වීමට තීරණය කර ඇති අතර, එම පරීක්ෂණය සඳහා අනුමත කාල සටහන මේ සමඟ ඉදිරිපත් කරමි.
+              <span className="font-bold">02.</span> ඒ අනුව, 2026 වර්ෂයේ 12-13 ශ්‍රේණි සඳහා අවසන් වාර පරීක්ෂණය <span className="font-semibold text-red-600 bg-red-50 px-1 rounded">2026 ජූලි මස 01 දින</span> සිට <span className="font-semibold text-red-600 bg-red-50 px-1 rounded">ජූලි මස 22 දින</span> දක්වා සතියේ දින 16 ක දී පැවැත්වීමට තීරණය කර ඇති අතර, එම පරීක්ෂණය සඳහා අනුමත කාල සටහන මේ සමඟ ඉදිරිපත් කරමි.
             </p>
             
             <p className="text-[10px] leading-relaxed text-slate-700 font-sans text-justify">
@@ -237,15 +250,15 @@ export const ScannedDocumentPage: React.FC<ScannedDocumentPageProps> = ({
                   <span>05. තොරතුරු සන්නිවේදන තාක්ෂණය (ICT)</span>
                   <span className="font-mono text-slate-500">PRINTED</span>
                 </div>
-                <div className="flex justify-between border-b border-slate-100 pb-0.5 text-rose-700">
+                <div className="flex justify-between border-b border-slate-100 pb-0.5 text-red-700">
                   <span>06. ආර්ථික විද්‍යාව (Economics)</span>
                   <span className="font-bold font-mono">PDF FORMAT</span>
                 </div>
-                <div className="flex justify-between border-b border-slate-100 pb-0.5 text-rose-700">
+                <div className="flex justify-between border-b border-slate-100 pb-0.5 text-red-700">
                   <span>07. ව්‍යාපාර අධ්‍යයනය (Business Studies)</span>
                   <span className="font-bold font-mono">PDF FORMAT</span>
                 </div>
-                <div className="flex justify-between border-b border-slate-100 pb-0.5 text-rose-700">
+                <div className="flex justify-between border-b border-slate-100 pb-0.5 text-red-700">
                   <span>08. ගිණුම්කරණය (Accounting)</span>
                   <span className="font-bold font-mono">PDF FORMAT</span>
                 </div>
@@ -270,11 +283,11 @@ export const ScannedDocumentPage: React.FC<ScannedDocumentPageProps> = ({
               <h5 className="text-[9px] font-extrabold text-slate-700 tracking-wider uppercase">බෙදාහැරීම් අදියර විස්තර</h5>
               <div className="grid grid-cols-2 gap-2 text-[9.5px]">
                 <div className="border-r border-slate-200 pr-1">
-                  <span className="font-bold text-rose-600">අදියර 01:</span><br />
+                  <span className="font-bold text-red-600">අදියර 01:</span><br />
                   පළමු සතිය සඳහා අවශ්‍ය ප්‍රශ්න පත්‍ර (ජූලි 01 - 10)
                 </div>
                 <div className="pl-1">
-                  <span className="font-bold text-rose-600">අදියර 02:</span><br />
+                  <span className="font-bold text-red-600">අදියර 02:</span><br />
                   දෙවන සතිය සඳහා අවශ්‍ය ප්‍රශ්න පත්‍ර (ජූලි 11 - 22)
                 </div>
               </div>
@@ -335,7 +348,7 @@ export const ScannedDocumentPage: React.FC<ScannedDocumentPageProps> = ({
       {/* Page Footer (Always visible) */}
       <div className="mt-6 pt-3 border-t border-slate-300 flex justify-between items-center text-[8px] text-slate-400 font-mono">
         <span>SOUTHERN PROVINCE DEPT. OF EDUCATION</span>
-        <div className="flex items-center gap-1 text-rose-600 font-bold bg-rose-50 px-1.5 py-0.5 rounded">
+        <div className="flex items-center gap-1 text-red-600 font-bold bg-red-50 px-1.5 py-0.5 rounded">
           <Award className="w-3 h-3" />
           <span>OFFICIAL CERTIFIED SCAN</span>
         </div>
