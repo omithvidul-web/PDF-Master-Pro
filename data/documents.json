@@ -11,7 +11,7 @@
     ],
     "bookmarkCount": 1,
     "isBookmarked": true,
-    "lastViewed": "2026-06-30T09:24:22.898Z",
+    "lastViewed": "2026-07-03T18:24:22.000Z",
     "created": "2026-06-19T08:30:00.000Z"
   },
   {
@@ -26,80 +26,12 @@
       {
         "pageNumber": 2,
         "content": "අනුමත කාලසටහන සහ විෂය මාධ්‍ය ලේඛනය (Approved Syllabus & Timetable Media List):\nසිංහල මාධ්‍ය (Sinhala Medium): කාල සටහනේ දක්වා ඇති සියලුම විෂයයන් සඳහා මුද්‍රිත ප්‍රශ්නපත්‍ර ලබාදේ.\nදෙමළ මාධ්‍ය (Tamil Medium): දෙමළ භාෂාව හා සාහිත්‍යය, ඉස්ලාම් ධර්මය සහ ඉස්ලාම් ශිෂ්ටාචාරය.\nඉංග්‍රීසි මාධ්‍ය (English Medium): ජීව විද්‍යාව (Biology), භෞතික විද්‍යාව (Physics), රසායන විද්‍යාව (Chemistry), සංයුක්ත ගණිතය (Combined Maths), තොරතුරු සන්නිවේදන තාක්ෂණය (ICT) - මුද්‍රිතව ලබාදේ.\nආර්ථික විද්‍යාව (Economics), ව්‍යාපාර අධ්‍යයනය (Business Studies), ගිණුම්කරණය (Accounting) - PDF ආකාරයෙන් ලබාදේ."
-      },
-      {
-        "pageNumber": 3,
-        "content": "ප්‍රශ්නපත්‍ර බෙදාහැරීමේ ක්‍රමවේදය (Distribution Strategy):\nමෙම අවසන් වාර පරීක්ෂණයට අදාළ මුද්‍රිත ප්‍රශ්නපත්‍ර මුද්‍රණාලය විසින් අදියර 02ක් (Two Phases) යටතේ කොට්ඨාස අධ්‍යාපන කාර්යාල වෙත භාරදීමට නියමිත ය.\nඅදියර 01: පළමු සතිය සඳහා අවශ්‍ය ප්‍රශ්න පත්‍ර (ජූලි 01 - 10).\nඅදියර 02: දෙවන සතිය සඳහා අවශ්‍ය ප්‍රශ්න පත්‍ර (ජූලි 11 - 22).\nකොට්ඨාස කාර්යාල මඟින් පාසල්වල විදුහල්පතිවරුන් වෙත මෙම අදියර යටතේ බෙදා දීමට සැලසුම් කර ඇත."
-      },
-      {
-        "pageNumber": 4,
-        "content": "කලාපීය සම්බන්ධීකරණය සහ අවසන් නියෝග:\nමෙම වාර විභාගය පැවැත්වීමේ දී මාගේ දප/අපද/ජාපා/05 සහ 2024.07.19 දිනැති “2024 වර්ෂයේ සිට ඉන් ඉදිරියට 6-13 වාර අවසාන ඇගයීම් පරීක්ෂණ පැවැත්වීම පිළිබඳ උපදෙස්” ලිපියේ උපදෙස් ප්‍රකාරව කටයුතු කළ යුතු ය.\nඑස්. ද සිල්වා (S. de Silva), පළාත් අධ්‍යාපන අධ්‍යක්ෂක, දකුණු පළාත, ගාල්ල."
       }
     ],
-    "bookmarkCount": 1,
-    "isBookmarked": true,
-    "lastViewed": "2026-06-30T09:15:34.555Z",
+    "bookmarkCount": 0,
+    "isBookmarked": false,
+    "lastViewed": "2026-07-03T19:15:34.000Z",
     "created": "2026-06-19T11:00:00.000Z"
-  },
-  {
-    "id": "doc-stats-3",
-    "name": "stats-3.csv",
-    "size": "152 B",
-    "pages": [
-      {
-        "pageNumber": 1,
-        "content": "Month,Revenue,Expenses,Profit\nJan,12000,8000,4000\nFeb,14000,8500,5500\nMar,16000,9000,7000"
-      }
-    ],
-    "bookmarkCount": 0,
-    "isBookmarked": false,
-    "lastViewed": "2026-05-15T15:20:00.000Z",
-    "created": "2026-05-15T15:15:00.000Z"
-  },
-  {
-    "id": "doc-stats-2",
-    "name": "stats-2.csv",
-    "size": "153 B",
-    "pages": [
-      {
-        "pageNumber": 1,
-        "content": "Category,Sales,Growth\nElectronics,500,12%\nApparel,300,8%\nGroceries,1200,15%"
-      }
-    ],
-    "bookmarkCount": 0,
-    "isBookmarked": true,
-    "lastViewed": "2026-06-30T09:25:16.642Z",
-    "created": "2026-05-12T11:20:00.000Z"
-  },
-  {
-    "id": "doc-stats-1",
-    "name": "stats-1.csv",
-    "size": "104 B",
-    "pages": [
-      {
-        "pageNumber": 1,
-        "content": "ID,User,Status\n101,Omith,Active\n102,Admin,Active\n103,Guest,Pending"
-      }
-    ],
-    "bookmarkCount": 0,
-    "isBookmarked": false,
-    "lastViewed": "2026-06-30T09:17:53.756Z",
-    "created": "2026-05-12T09:30:00.000Z"
-  },
-  {
-    "id": "doc-stats",
-    "name": "stats.csv",
-    "size": "68 B",
-    "pages": [
-      {
-        "pageNumber": 1,
-        "content": "Key,Value\nActiveUsers,1420\nTransactions,84\nAppVersion,2.4"
-      }
-    ],
-    "bookmarkCount": 0,
-    "isBookmarked": false,
-    "lastViewed": "2026-06-30T09:17:45.254Z",
-    "created": "2026-05-11T14:05:00.000Z"
   },
   {
     "id": "doc-locked",
@@ -118,35 +50,81 @@
     "created": "2026-05-04T11:55:00.000Z"
   },
   {
-    "id": "doc-word-sample",
-    "name": "Project_Proposal_Final.docx",
-    "size": "1.2 MB",
+    "id": "doc-word-notes",
+    "name": "Meeting Notes.docx",
+    "size": "120.0 KB",
     "isWord": true,
     "pages": [
       {
         "pageNumber": 1,
-        "content": "=== Microsoft Word Document ===\nTitle: Project Proposal Final Version\nAuthor: Executive Team\n\nAbstract:\nThis proposal outlines the deployment model of PDF Master Pro across standard enterprise cloud nodes. Key metrics indicate a 400% efficiency gain in document processing pipelines."
+        "content": "=== Microsoft Word Document ===\nTitle: Meeting Notes\nDate: Yesterday\nAttendees: Executive Strategy Team\n\nDiscussion Points:\n1. Q3 Roadmap review and target milestones.\n2. Security parameters and encryption protocols.\n3. Mobile app development sprint updates."
       }
     ],
-    "bookmarkCount": 0,
+    "bookmarkCount": 1,
     "isBookmarked": true,
-    "lastViewed": "2026-06-30T09:18:26.868Z",
-    "created": "2026-06-25T10:00:00.000Z"
+    "lastViewed": "2026-07-03T14:30:00.000Z",
+    "created": "2026-07-03T10:00:00.000Z"
   },
   {
-    "id": "doc-ppt-sample",
-    "name": "Corporate_Pitch_Deck.pptx",
-    "size": "4.8 MB",
-    "isPPT": true,
+    "id": "doc-word-contract",
+    "name": "Contract Agreement.docx",
+    "size": "2.1 MB",
+    "isWord": true,
     "pages": [
       {
         "pageNumber": 1,
-        "content": "=== PowerPoint Presentation ===\nSlide 1: PDF Master Pro Suite Pitch\nSlide 2: Enterprise Market Dynamics\nSlide 3: Real-time Cloud Synchronization\nSlide 4: Key Financial Highlights"
+        "content": "=== Microsoft Word Document ===\nTitle: Contract Agreement\nDate: 5 days ago\n\nThis binding agreement outlines the terms and conditions for corporate service provision. Both parties agree to execute tasks with utmost technical alignment and security compliance."
       }
     ],
     "bookmarkCount": 0,
     "isBookmarked": false,
-    "lastViewed": "2026-06-28T15:30:00.000Z",
-    "created": "2026-06-28T15:00:00.000Z"
+    "lastViewed": "2026-06-29T15:00:00.000Z",
+    "created": "2026-06-29T11:00:00.000Z"
+  },
+  {
+    "id": "doc-excel-statement",
+    "name": "Financial Statement Q1.xlsx",
+    "size": "750.0 KB",
+    "pages": [
+      {
+        "pageNumber": 1,
+        "content": "Category,Budget,Actual,Variance\nMarketing,50000,48000,2000\nDevelopment,120000,118500,1500\nOperations,35000,36200,-1200\nSales,45000,44000,1000"
+      }
+    ],
+    "bookmarkCount": 0,
+    "isBookmarked": false,
+    "lastViewed": "2026-07-02T16:00:00.000Z",
+    "created": "2026-07-02T14:00:00.000Z"
+  },
+  {
+    "id": "doc-excel-tracker",
+    "name": "Budget Tracker Q2.xlsx",
+    "size": "890.0 KB",
+    "pages": [
+      {
+        "pageNumber": 1,
+        "content": "Month,Income,Expenses,Savings\nApril,15000,11200,3800\nMay,16200,12100,4100\nJune,17500,13000,4500"
+      }
+    ],
+    "bookmarkCount": 0,
+    "isBookmarked": false,
+    "lastViewed": "2026-06-27T10:30:00.000Z",
+    "created": "2026-06-27T09:00:00.000Z"
+  },
+  {
+    "id": "doc-ppt-strategy",
+    "name": "Marketing Strategy 2026.pptx",
+    "size": "5.2 MB",
+    "isPPT": true,
+    "pages": [
+      {
+        "pageNumber": 1,
+        "content": "=== PowerPoint Presentation ===\nSlide 1: Global Marketing Strategy 2026\nSlide 2: Target Audience Demographics & Reach\nSlide 3: Budget Allocations & Channel Selection\nSlide 4: Key Performance Indicators & Metrics"
+      }
+    ],
+    "bookmarkCount": 0,
+    "isBookmarked": false,
+    "lastViewed": "2026-07-01T18:00:00.000Z",
+    "created": "2026-07-01T15:00:00.000Z"
   }
 ]

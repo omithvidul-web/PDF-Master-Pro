@@ -8,7 +8,56 @@ interface ScannedDocumentPageProps {
   searchQuery: string;
   documentName: string;
   documentId: string;
+  readerTheme?: 'white' | 'mint' | 'tan' | 'slate' | 'black';
 }
+
+const themeStyles = {
+  white: {
+    bg: 'bg-white',
+    text: 'text-slate-800',
+    title: 'text-slate-900',
+    subtitle: 'text-slate-700',
+    border: 'border-slate-100',
+    pill: 'bg-slate-100 text-slate-500',
+    highlight: 'bg-yellow-300 text-slate-900',
+  },
+  mint: {
+    bg: 'bg-[#eaf6ec]',
+    text: 'text-[#1e3d22]',
+    title: 'text-[#0e2c12]',
+    subtitle: 'text-[#2a4d2e]',
+    border: 'border-emerald-200/40',
+    pill: 'bg-[#d8edd9] text-[#1e3d22]',
+    highlight: 'bg-yellow-200 text-slate-900',
+  },
+  tan: {
+    bg: 'bg-[#f4ece1]',
+    text: 'text-[#4e342e]',
+    title: 'text-[#3e2723]',
+    subtitle: 'text-[#5d4037]',
+    border: 'border-amber-200/40',
+    pill: 'bg-[#e7dbcb] text-[#4e342e]',
+    highlight: 'bg-yellow-200 text-slate-900',
+  },
+  slate: {
+    bg: 'bg-[#ebf0f5]',
+    text: 'text-[#263238]',
+    title: 'text-[#1a237e]',
+    subtitle: 'text-[#37474f]',
+    border: 'border-blue-200/40',
+    pill: 'bg-[#dae5ed] text-[#263238]',
+    highlight: 'bg-yellow-200 text-slate-900',
+  },
+  black: {
+    bg: 'bg-[#121212]',
+    text: 'text-[#cccccc]',
+    title: 'text-[#ffffff]',
+    subtitle: 'text-[#aaaaaa]',
+    border: 'border-neutral-800',
+    pill: 'bg-[#222222] text-[#aaaaaa]',
+    highlight: 'bg-yellow-500/40 text-white',
+  }
+};
 
 export const ScannedDocumentPage: React.FC<ScannedDocumentPageProps> = ({
   pageNumber,
@@ -17,7 +66,10 @@ export const ScannedDocumentPage: React.FC<ScannedDocumentPageProps> = ({
   searchQuery,
   documentName,
   documentId,
+  readerTheme = 'white',
 }) => {
+  const styles = themeStyles[readerTheme] || themeStyles.white;
+
   // Highlight helper
   const renderHighlightedText = (text: string, search: string) => {
     if (!search || !text) return <span className="whitespace-pre-wrap">{text}</span>;
@@ -49,7 +101,7 @@ export const ScannedDocumentPage: React.FC<ScannedDocumentPageProps> = ({
       return (
         <div 
           id="default-scanned-page"
-          className="w-full h-full bg-white overflow-hidden font-sans relative flex items-center justify-center flex-1"
+          className={`w-full h-full overflow-hidden font-sans relative flex items-center justify-center flex-1 min-h-[400px] ${styles.bg}`}
         >
           <img src={imageBase64} alt={`Page ${pageNumber}`} className="max-w-full max-h-full object-contain" referrerPolicy="no-referrer" />
         </div>
@@ -60,34 +112,34 @@ export const ScannedDocumentPage: React.FC<ScannedDocumentPageProps> = ({
     return (
       <div 
         id="default-scanned-page"
-        className="w-full h-full bg-white text-slate-800 p-8 flex flex-col justify-between font-sans relative flex-1"
+        className={`w-full h-full p-8 flex flex-col justify-between font-sans relative flex-1 min-h-[400px] transition-colors duration-300 ${styles.bg} ${styles.text}`}
       >
         {/* Subtle physical paper texture simulation */}
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px] rounded-xl" />
         
         <div>
           {/* Default Document Header */}
-          <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
+          <div className={`flex justify-between items-center border-b pb-4 mb-6 ${styles.border}`}>
             <div className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-red-500" />
-              <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">PDF Master Secure Scan</span>
+              <span className={`text-[10px] uppercase tracking-widest font-bold ${styles.subtitle}`}>PDF Master Secure Scan</span>
             </div>
-            <span className="text-xs font-mono font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+            <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${styles.pill}`}>
               PG. {pageNumber}
             </span>
           </div>
 
-          <h2 className="text-sm font-bold text-slate-900 mb-4 tracking-tight border-b border-slate-50/50 pb-2">
+          <h2 className={`text-sm font-bold mb-4 tracking-tight border-b pb-2 ${styles.title} ${styles.border}`}>
             {documentName}
           </h2>
 
-          <div className="text-xs leading-relaxed text-slate-700 tracking-normal font-sans text-left">
+          <div className="text-xs leading-relaxed tracking-normal font-sans text-left">
             {renderHighlightedText(content, searchQuery)}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-center text-[9px] text-slate-400 font-mono">
+        <div className={`mt-8 pt-4 border-t flex justify-between items-center text-[9px] font-mono ${styles.border} ${styles.subtitle}`}>
           <span>MD5 SECURE HASH VERIFIED</span>
           <div className="flex items-center gap-1 text-emerald-600 font-bold">
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -102,11 +154,11 @@ export const ScannedDocumentPage: React.FC<ScannedDocumentPageProps> = ({
   return (
     <div 
       id="southern-province-circular-page"
-      className="w-full h-full bg-[#f9f9fa] text-slate-800 p-6 md:p-8 flex flex-col justify-between relative font-sans overflow-hidden select-none flex-1"
-      style={{
+      className={`w-full h-full p-6 md:p-8 flex flex-col justify-between relative font-sans overflow-hidden select-none flex-1 min-h-[450px] transition-colors duration-300 ${styles.bg} ${styles.text}`}
+      style={readerTheme === 'white' ? {
         backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.94)), radial-gradient(#aaa 1px, transparent 1px)',
         backgroundSize: '100% 100%, 24px 24px',
-      }}
+      } : {}}
     >
       {/* Page Header (Only visible on page 1) */}
       {pageNumber === 1 && (

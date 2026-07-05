@@ -169,36 +169,82 @@ const DEFAULT_DOCUMENTS = [
     created: "2026-05-04T11:55:00.000Z"
   },
   {
-    id: "doc-word-sample",
-    name: "Project_Proposal_Final.docx",
-    size: "1.2 MB",
+    id: "doc-word-notes",
+    name: "Meeting Notes.docx",
+    size: "120.0 KB",
     isWord: true,
     pages: [
       {
         pageNumber: 1,
-        content: "=== Microsoft Word Document ===\nTitle: Project Proposal Final Version\nAuthor: Executive Team\n\nAbstract:\nThis proposal outlines the deployment model of PDF Master Pro across standard enterprise cloud nodes. Key metrics indicate a 400% efficiency gain in document processing pipelines."
+        content: "=== Microsoft Word Document ===\nTitle: Meeting Notes\nDate: Yesterday\nAttendees: Executive Strategy Team\n\nDiscussion Points:\n1. Q3 Roadmap review and target milestones.\n2. Security parameters and encryption protocols.\n3. Mobile app development sprint updates."
+      }
+    ],
+    bookmarkCount: 1,
+    isBookmarked: true,
+    lastViewed: "2026-07-03T14:30:00.000Z",
+    created: "2026-07-03T10:00:00.000Z"
+  },
+  {
+    id: "doc-word-contract",
+    name: "Contract Agreement.docx",
+    size: "2.1 MB",
+    isWord: true,
+    pages: [
+      {
+        pageNumber: 1,
+        content: "=== Microsoft Word Document ===\nTitle: Contract Agreement\nDate: 5 days ago\n\nThis binding agreement outlines the terms and conditions for corporate service provision. Both parties agree to execute tasks with utmost technical alignment and security compliance."
       }
     ],
     bookmarkCount: 0,
     isBookmarked: false,
-    lastViewed: "2026-06-25T11:00:00.000Z",
-    created: "2026-06-25T10:00:00.000Z"
+    lastViewed: "2026-06-29T15:00:00.000Z",
+    created: "2026-06-29T11:00:00.000Z"
   },
   {
-    id: "doc-ppt-sample",
-    name: "Corporate_Pitch_Deck.pptx",
-    size: "4.8 MB",
+    id: "doc-excel-statement",
+    name: "Financial Statement Q1.xlsx",
+    size: "750.0 KB",
+    pages: [
+      {
+        pageNumber: 1,
+        content: "Category,Budget,Actual,Variance\nMarketing,50000,48000,2000\nDevelopment,120000,118500,1500\nOperations,35000,36200,-1200\nSales,45000,44000,1000"
+      }
+    ],
+    bookmarkCount: 0,
+    isBookmarked: false,
+    lastViewed: "2026-07-02T16:00:00.000Z",
+    created: "2026-07-02T14:00:00.000Z"
+  },
+  {
+    id: "doc-excel-tracker",
+    name: "Budget Tracker Q2.xlsx",
+    size: "890.0 KB",
+    pages: [
+      {
+        pageNumber: 1,
+        content: "Month,Income,Expenses,Savings\nApril,15000,11200,3800\nMay,16200,12100,4100\nJune,17500,13000,4500"
+      }
+    ],
+    bookmarkCount: 0,
+    isBookmarked: false,
+    lastViewed: "2026-06-27T10:30:00.000Z",
+    created: "2026-06-27T09:00:00.000Z"
+  },
+  {
+    id: "doc-ppt-strategy",
+    name: "Marketing Strategy 2026.pptx",
+    size: "5.2 MB",
     isPPT: true,
     pages: [
       {
         pageNumber: 1,
-        content: "=== PowerPoint Presentation ===\nSlide 1: PDF Master Pro Suite Pitch\nSlide 2: Enterprise Market Dynamics\nSlide 3: Real-time Cloud Synchronization\nSlide 4: Key Financial Highlights"
+        content: "=== PowerPoint Presentation ===\nSlide 1: Global Marketing Strategy 2026\nSlide 2: Target Audience Demographics & Reach\nSlide 3: Budget Allocations & Channel Selection\nSlide 4: Key Performance Indicators & Metrics"
       }
     ],
     bookmarkCount: 0,
     isBookmarked: false,
-    lastViewed: "2026-06-28T15:30:00.000Z",
-    created: "2026-06-28T15:00:00.000Z"
+    lastViewed: "2026-07-01T18:00:00.000Z",
+    created: "2026-07-01T15:00:00.000Z"
   }
 ];
 

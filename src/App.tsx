@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   FileText, Folder, Search, Menu, Settings, Info, PhoneCall, ShieldAlert, BookOpen,
-  Sparkles, Plus, Trash2, Edit, Bookmark, Star, Volume2, VolumeX, ArrowLeft, ChevronRight,
+  Sparkles, Plus, Trash2, Edit, Bookmark, Star, Volume2, VolumeX, ArrowLeft, ChevronRight, ChevronLeft,
   ArrowLeftRight, FileDown, X, Lock, Unlock, Settings2, Save, Moon, Sun, Cpu, Layers, Eye, Share2,
   CheckCircle, RefreshCw, Sliders, Download, Maximize, Minimize, Compass, ExternalLink, Play, Pause,
   Printer, PenTool, FileSpreadsheet, MoreVertical, Calendar, Crop, Grid, FileImage, Check, RotateCcw,
-  Send, Bell, Globe, HelpCircle, Heart
+  Send, Bell, Globe, HelpCircle, Heart, BookMarked, FileCheck, LayoutGrid, Scissors, ShieldCheck, Type
 } from 'lucide-react';
 
 // @ts-ignore
@@ -150,7 +150,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSortMenu, setShowSortMenu] = useState(false);
-  const [sortBy, setSortBy] = useState<'date' | 'name' | 'size'>('date');
+  const [sortBy, setSortBy] = useState<'date_newest' | 'date_oldest' | 'name_az' | 'name_za' | 'size_largest' | 'size_smallest'>('date_newest');
   
   // UI Dialog Modals
   const [selectedDoc, setSelectedDoc] = useState<PDFDocument | null>(null);
@@ -237,6 +237,19 @@ export default function App() {
   const [noteInput, setNoteInput] = useState('');
   const [showSearchToolbar, setShowSearchToolbar] = useState(false);
   const [readerPaperTint, setReaderPaperTint] = useState<'white' | 'sepia' | 'dark'>('white');
+  const [readerTheme, setReaderTheme] = useState<'white' | 'mint' | 'tan' | 'slate' | 'black'>('white');
+  const [readerScrollDirection, setReaderScrollDirection] = useState<'vertical' | 'horizontal'>('vertical');
+  const [readerBrightness, setReaderBrightness] = useState<number>(100);
+  const [readerBrightnessAuto, setReaderBrightnessAuto] = useState<boolean>(false);
+  const [readerContinuous, setReaderContinuous] = useState<boolean>(true);
+  const [readerNightMode, setReaderNightMode] = useState<boolean>(false);
+  const [showReaderSettingsSheet, setShowReaderSettingsSheet] = useState<boolean>(false);
+  const [showReaderMenuSheet, setShowReaderMenuSheet] = useState<boolean>(false);
+  const [showGoToPageDialog, setShowGoToPageDialog] = useState<boolean>(false);
+  const [goToPageInput, setGoToPageInput] = useState<string>('');
+  const [showCompressDialog, setShowCompressDialog] = useState<boolean>(false);
+  const [compressQuality, setCompressQuality] = useState<'small' | 'medium' | 'large'>('medium');
+  const [compressTargetDoc, setCompressTargetDoc] = useState<PDFDocument | null>(null);
 
   // General States
   const [statusNotification, setStatusNotification] = useState<string | null>(null);
@@ -261,7 +274,7 @@ export default function App() {
   const [selectedAdminPageKey, setSelectedAdminPageKey] = useState<string>('about');
 
   // Admin Navigation Helper Functions
-  const moveNavItem = (index: number, direction: 'sp' | 'down') => {
+  const moveNavItem = (index: number, direction: 'up' | 'down') => {
     const updated = [...adminNavs].sort((a, b) => a.order - b.order);
     if (direction === 'up' && index > 0) {
       const temp = updated[index];
@@ -333,7 +346,7 @@ export default function App() {
     triggerNotification('🗑️ Navigation item deleted.');
   };
 
-  const handleUpdateNavItem = (id: string, fields: strtial<NavItem>) => {
+  const handleUpdateNavItem = (id: string, fields: Partial<NavItem>) => {
     setAdminNavs(prev => prev.map(nav => {
       if (nav.id === id) {
         const updatedNav = { ...nav, ...fields };
@@ -385,7 +398,7 @@ export default function App() {
       setDocuments(docsData);
     } catch (err) {
       console.error('Error loading documents:', err);
-      triggerNotification('⚠️ Connection error. Mode: 'Offline Storage.');
+      triggerNotification('⚠️ Connection error. Mode: Offline Storage.');
     } finally {
       if (!silent) setIsLoading(false);
     }
@@ -405,8 +418,69 @@ export default function App() {
     }
   }, [currentScreen]);
 
+  // Custom function to navigate to a page and scroll it smoothly into view
+  const navigateToPage = (pageNum: number) => {
+    setReaderPage(pageNum);
+    
+    // Smoothly scroll the target page card into view if in continuous mode
+    if (readerContinuous) {
+      setTimeout(() => {
+        const card = document.getElementById(`reader-page-card-${pageNum}`);
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        }
+      }, 80);
+    }
+  };
+
+  // Scroll Listener for Continuous Scroll Mode to auto-update active readerPage indicator
+  useEffect(() => {
+    const container = document.getElementById('reader-continuous-scroll-container');
+    if (!container || !readerContinuous || currentScreen !== 'reader' || !selectedDoc) return;
+
+    const handleScroll = () => {
+      const children = container.children;
+      let closestPage = 1;
+      let minDistance = Infinity;
+
+      const containerRect = container.getBoundingClientRect();
+      const containerCenter = readerScrollDirection === 'horizontal'
+        ? containerRect.left + containerRect.width / 2
+        : containerRect.top + containerRect.height / 2;
+
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        const childRect = child.getBoundingClientRect();
+        const childCenter = readerScrollDirection === 'horizontal'
+          ? childRect.left + childRect.width / 2
+          : childRect.top + childRect.height / 2;
+
+        const distance = Math.abs(childCenter - containerCenter);
+        if (distance < minDistance) {
+          minDistance = distance;
+          // ID format: reader-page-card-{pageNum}
+          const idParts = child.id.split('-');
+          const pageNum = parseInt(idParts[idParts.length - 1]);
+          if (!isNaN(pageNum)) {
+            closestPage = pageNum;
+          }
+        }
+      }
+
+      setReaderPage(closestPage);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    // Run once on load to align initial page
+    handleScroll();
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, [readerContinuous, currentScreen, selectedDoc, readerScrollDirection, readerZoom]);
+
   // Handle document clicks (including pin check)
-  const handleDocClick = (doc: ''FDocument) => {
+  const handleDocClick = (doc: PDFDocument) => {
     if (doc.isLocked) {
       setLockedDocToOpen(doc);
       setPinInput('');
@@ -417,7 +491,7 @@ export default function App() {
   };
 
   // Open PDF Reader Screen
-  const openReader = (doc: ''FDocument) => {
+  const openReader = (doc: PDFDocument) => {
     setSelectedDoc(doc);
     setReaderPage(1);
     setReaderZoom(100);
@@ -428,9 +502,9 @@ export default function App() {
     
     // Register lastViewed in DB
     fetch('/api/documents', {
-      method: ''OST',
-      headers: '''Content-Type': 'spplication/json' },
-      body: ''ON.stringify({ document: { ...doc, lastViewed: new Date().toISOString() } })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document: { ...doc, lastViewed: new Date().toISOString() } })
     }).then(res => res.json()).then(data => {
       if (data.documents) setDocuments(data.documents);
     });
@@ -471,7 +545,7 @@ export default function App() {
   const deleteDocument = async (id: string) => {
     if (!window.confirm('Delete this file permanently?')) return;
     try {
-      const res = await fetch(`/api/documents/${id}`, { method: ''ELETE' });
+      const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
       const data = await res.json();
       setDocuments(data.documents);
       triggerNotification('🗑️ Document deleted successfully.');
@@ -481,20 +555,20 @@ export default function App() {
   };
 
   // Toggle Star Bookmark
-  const toggleBookmark = async (doc: ''FDocument) => {
-    const updated = { ...doc, isBookmarked: ''oc.isBookmarked };
+  const toggleBookmark = async (doc: PDFDocument) => {
+    const updated = { ...doc, isBookmarked: !doc.isBookmarked };
     try {
       const res = await fetch('/api/documents', {
-        method: ''OST',
-        headers: '''Content-Type': 'spplication/json' },
-        body: ''ON.stringify({ document: ''dated })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document: updated })
       });
       const data = await res.json();
       setDocuments(data.documents);
       if (selectedDoc && selectedDoc.id === doc.id) {
         setSelectedDoc(updated);
       }
-      triggerNotification(updated.isBookmarked ? '⭐ Added to Bookmarks.' : '' Removed from Bookmarks.');
+      triggerNotification(updated.isBookmarked ? '⭐ Added to Bookmarks.' : 'Removed from Bookmarks.');
     } catch (err) {
       triggerNotification('❌ Bookmark sync error.');
     }
@@ -509,16 +583,16 @@ export default function App() {
     setOcrLoading(true);
     try {
       const response = await fetch('/api/ocr', {
-        method: ''OST',
-        headers: '''Content-Type': 'spplication/json' },
-        body: ''ON.stringify({ image: strImage, language: strLanguage, documentName: strDocName })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: ocrImage, language: ocrLanguage, documentName: ocrDocName })
       });
       const data = await response.json();
       if (data.error) throw new Error(data.error);
       setOcrResult(data.text);
       triggerNotification('⚡ Gemini OCR extraction finished!');
     } catch (err: any) {
-      triggerNotification(`❌ OCR Failed: ''err.message || 'Server error'}`);
+      triggerNotification(`❌ OCR Failed: ${err.message || 'Server error'}`);
     } finally {
       setOcrLoading(false);
     }
@@ -533,9 +607,9 @@ export default function App() {
     setConvLoading(true);
     try {
       const res = await fetch('/api/tools/convert', {
-        method: ''OST',
-        headers: '''Content-Type': 'spplication/json' },
-        body: ''ON.stringify({ title: pinvTitle, sourceText: pinvText, fileType: ''DF' })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: convTitle, sourceText: convText, fileType: 'PDF' })
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -545,7 +619,7 @@ export default function App() {
       setConvText('');
       setActiveTab('all_files');
     } catch (err: any) {
-      triggerNotification(`❌ Conversion failed: ''err.message}`);
+      triggerNotification(`❌ Conversion failed: ${err.message}`);
     } finally {
       setConvLoading(false);
     }
@@ -566,22 +640,22 @@ export default function App() {
       docsToMerge.forEach(doc => {
         doc.pages.forEach(p => {
           mergedPages.push({
-            pageNumber: strrentPg++,
-            content: ''Merged from ${doc.name}]\n${p.content}`
+            pageNumber: currentPg++,
+            content: `[Merged from ${doc.name}]\n${p.content}`
           });
         });
       });
 
       const res = await fetch('/api/documents', {
-        method: ''OST',
-        headers: '''Content-Type': 'spplication/json' },
-        body: ''ON.stringify({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           document: {
-            name: strgeTitle.endsWith('.pdf') ? mergeTitle : ''{mergeTitle}.pdf`,
-            size: ''.5 MB',
-            pages: strgedPages,
-            bookmarkCount: ''
-            isBookmarked: nullse
+            name: mergeTitle.endsWith('.pdf') ? mergeTitle : `${mergeTitle}.pdf`,
+            size: '1.5 MB',
+            pages: mergedPages,
+            bookmarkCount: 0,
+            isBookmarked: false
           }
         })
       });
@@ -599,23 +673,31 @@ export default function App() {
   };
 
   // Compress PDF Action
-  const runCompressPDF = async (doc: ''FDocument) => {
+  const runCompressPDF = async (doc: PDFDocument, quality: 'small' | 'medium' | 'large' = 'medium') => {
     setCompressingDoc(doc);
     setTimeout(async () => {
+      let ratio = 0.6;
+      if (quality === 'small') ratio = 0.35;
+      else if (quality === 'medium') ratio = 0.6;
+      else if (quality === 'large') ratio = 0.85;
+
       const updated = {
         ...doc,
-        size: ''c.size.includes('KB') 
-          ? `${Math.max(10, Math.round(parseFloat(doc.size) * 0.6))} KB`
-          : ''{Math.max(0.2, parseFloat((parseFloat(doc.size) * 0.5).toFixed(1)))} MB`
+        size: doc.size.includes('KB') 
+          ? `${Math.max(10, Math.round(parseFloat(doc.size) * ratio))} KB`
+          : `${Math.max(0.2, parseFloat((parseFloat(doc.size) * ratio).toFixed(1)))} MB`
       };
       
       const res = await fetch('/api/documents', {
-        method: ''OST',
-        headers: '''Content-Type': 'spplication/json' },
-        body: ''ON.stringify({ document: ''dated })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document: updated })
       });
       const data = await res.json();
       setDocuments(data.documents);
+      if (selectedDoc && selectedDoc.id === doc.id) {
+        setSelectedDoc(updated);
+      }
       setCompressingDoc(null);
       triggerNotification(`📉 Compressed "${doc.name}" down to ${updated.size}!`);
     }, 1800);
@@ -626,22 +708,22 @@ export default function App() {
     if (!signingDoc || !signingName.trim()) return;
     const updated = {
       ...signingDoc,
-      pages: ''gningDoc.pages.map(p => ({
+      pages: signingDoc.pages.map(p => ({
         ...p,
-        content: ''{p.content}\n\n[🔒 SIGNED BY: ''signingName} (Date: pinew Date().toLocaleDateString()})]`
+        content: `${p.content}\n\n[🔒 SIGNED BY: ${signingName} (Date: ${new Date().toLocaleDateString()})]`
       }))
     };
     
     const res = await fetch('/api/documents', {
-      method: ''OST',
-      headers: '''Content-Type': 'spplication/json' },
-      body: ''ON.stringify({ document: ''dated })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document: updated })
     });
     const data = await res.json();
     setDocuments(data.documents);
     setSigningDoc(null);
     setSigningName('');
-    triggerNotification(`🖋️ Document signed with signature: ''{signingName}"!`);
+    triggerNotification(`🖋️ Document signed with signature: "${signingName}"!`);
   };
 
   // Edit Text Document Action
@@ -649,13 +731,13 @@ export default function App() {
     if (!editorDoc) return;
     const updated = {
       ...editorDoc,
-      pages: ''itorDoc.pages.map((p, idx) => idx === 0 ? { ...p, content: ''itorText } : ''
+      pages: editorDoc.pages.map((p, idx) => idx === 0 ? { ...p, content: editorText } : p)
     };
 
     const res = await fetch('/api/documents', {
-      method: ''OST',
-      headers: '''Content-Type': 'spplication/json' },
-      body: ''ON.stringify({ document: ''dated })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document: updated })
     });
     const data = await res.json();
     setDocuments(data.documents);
@@ -667,11 +749,11 @@ export default function App() {
   // Lock document setup
   const runLockDocument = async () => {
     if (!lockSetupDoc || !lockSetupPin) return;
-    const updated = { ...lockSetupDoc, isLocked: ''ue };
+    const updated = { ...lockSetupDoc, isLocked: true };
     const res = await fetch('/api/documents', {
-      method: ''OST',
-      headers: '''Content-Type': 'spplication/json' },
-      body: ''ON.stringify({ document: ''dated })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document: updated })
     });
     const data = await res.json();
     setDocuments(data.documents);
@@ -681,12 +763,12 @@ export default function App() {
   };
 
   // Unlock document permanently
-  const runUnlockDocumentPermanently = async (doc: ''FDocument) => {
-    const updated = { ...doc, isLocked: nullse };
+  const runUnlockDocumentPermanently = async (doc: PDFDocument) => {
+    const updated = { ...doc, isLocked: false };
     const res = await fetch('/api/documents', {
-      method: ''OST',
-      headers: '''Content-Type': 'spplication/json' },
-      body: ''ON.stringify({ document: ''dated })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document: updated })
     });
     const data = await res.json();
     setDocuments(data.documents);
@@ -709,7 +791,7 @@ export default function App() {
   };
 
   // Preloaded OCR Samples
-  const loadOcrSample = (type: ''eceipt' | 'report') => {
+  const loadOcrSample = (type: 'receipt' | 'report') => {
     if (type === 'receipt') {
       setOcrImage('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASw==');
       setOcrDocName('Coffee_Shop_Receipt');
@@ -729,32 +811,32 @@ export default function App() {
     }
     setImageToPdfLoading(true);
     try {
-      const docName = imageToPdfName.trim().endsWith('.pdf') ? imageToPdfName.trim() : ''{imageToPdfName.trim()}.pdf`;
+      const docName = imageToPdfName.trim().endsWith('.pdf') ? imageToPdfName.trim() : `${imageToPdfName.trim()}.pdf`;
       const res = await fetch('/api/documents', {
-        method: ''OST',
-        headers: '''Content-Type': 'spplication/json' },
-        body: ''ON.stringify({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           document: {
-            name: ''cName,
-            size: ''12 KB',
-            pages: ''ageToPdfFiles.length > 0 ? imageToPdfFiles.map((file, idx) => ({
+            name: docName,
+            size: '512 KB',
+            pages: imageToPdfFiles.length > 0 ? imageToPdfFiles.map((file, idx) => ({
               pageNumber: idx + 1,
-              content: ''== IMAGE CONVERTED TO PDF ===\nSource Image File: ''file.name}\nGenerated Date: pinew Date().toLocaleDateString()}\n\n[Raster Image Data Compiled successfully inside standard PDF page container. Coordinates, colors, and EXIF attributes preserved.]`,
-              imageBase64: nulle.base64
+              content: `== IMAGE CONVERTED TO PDF ===\nSource Image File: ${file.name}\nGenerated Date: ${new Date().toLocaleDateString()}\n\n[Raster Image Data Compiled successfully inside standard PDF page container. Coordinates, colors, and EXIF attributes preserved.]`,
+              imageBase64: file.base64
             })) : [
               {
-                pageNumber: ''
-                content: ''== IMAGE CONVERTED TO PDF ===\nSource Image File: ''imageToPdfSelected}\nGenerated Date: pinew Date().toLocaleDateString()}\n\n[Raster Image Data Compiled successfully inside standard PDF page container. Coordinates, colors, and EXIF attributes preserved.]`
+                pageNumber: 1,
+                content: `== IMAGE CONVERTED TO PDF ===\nSource Image File: ${imageToPdfSelected}\nGenerated Date: ${new Date().toLocaleDateString()}\n\n[Raster Image Data Compiled successfully inside standard PDF page container. Coordinates, colors, and EXIF attributes preserved.]`
               }
             ],
-            bookmarkCount: ''
-            isBookmarked: nullse
+            bookmarkCount: 0,
+            isBookmarked: false
           }
         })
       });
       const data = await res.json();
       setDocuments(data.documents);
-      triggerNotification(`🎉 Image successfully converted to PDF: ''{docName}"!`);
+      triggerNotification(`🎉 Image successfully converted to PDF: "${docName}"!`);
       setImageToPdfSelected(null);
       setImageToPdfFiles([]);
       setImageToPdfName('My_Photo_Converted');
@@ -775,28 +857,28 @@ export default function App() {
     }
     setIdCardLoading(true);
     try {
-      const docName = idCardName.trim().endsWith('.pdf') ? idCardName.trim() : ''{idCardName.trim()}.pdf`;
+      const docName = idCardName.trim().endsWith('.pdf') ? idCardName.trim() : `${idCardName.trim()}.pdf`;
       const res = await fetch('/api/documents', {
-        method: ''OST',
-        headers: '''Content-Type': 'spplication/json' },
-        body: ''ON.stringify({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           document: {
-            name: ''cName,
-            size: ''20 KB',
+            name: docName,
+            size: '320 KB',
             pages: [
               {
-                pageNumber: ''
-                content: ''== MERGED DUAL-SIDE ID CARD SCAN ===\nDocument ID Name: 'gridCardName}\n\n=========================================\n[ FRONT SIDE - NATIONAL IDENTITY CARD ]\nHolder Photo & Hologram Verified.\nSerial: ''-88294-A2\n=========================================\n\n=========================================\n[ BACK SIDE - CODES & CHIP DETAILS ]\nMagnetic Strip Hash Code: ''94EF29CA\nIssuer: ''vernment Authority Dept\n=========================================\n\n[🛡️ SECURITY WATERMARK: ''F MASTER PRO ORIGINAL SECURE ID SCAN]`
+                pageNumber: 1,
+                content: `== MERGED DUAL-SIDE ID CARD SCAN ===\nDocument ID Name: ${idCardName}\n\n=========================================\n[ FRONT SIDE - NATIONAL IDENTITY CARD ]\nHolder Photo & Hologram Verified.\nSerial: NIC-88294-A2\n=========================================\n\n=========================================\n[ BACK SIDE - CODES & CHIP DETAILS ]\nMagnetic Strip Hash Code: 494EF29CA\nIssuer: Government Authority Dept\n=========================================\n\n[🛡️ SECURITY WATERMARK: PDF MASTER PRO ORIGINAL SECURE ID SCAN]`
               }
             ],
-            bookmarkCount: ''
-            isBookmarked: nullse
+            bookmarkCount: 0,
+            isBookmarked: false
           }
         })
       });
       const data = await res.json();
       setDocuments(data.documents);
-      triggerNotification(`🎉 ID Card Front & Back successfully compiled to PDF: ''{docName}"!`);
+      triggerNotification(`🎉 ID Card Front & Back successfully compiled to PDF: "${docName}"!`);
       setIdCardFrontScanned(false);
       setIdCardBackScanned(false);
       setActiveTool(null);
@@ -809,30 +891,30 @@ export default function App() {
   };
 
   // Word to PDF converter
-  const runWordToPdf = async (doc: ''FDocument) => {
+  const runWordToPdf = async (doc: PDFDocument) => {
     const baseName = doc.name.replace(/\.[^/.]+$/, "");
     const pdfName = `${baseName}_converted.pdf`;
     
     try {
       const res = await fetch('/api/documents', {
-        method: ''OST',
-        headers: '''Content-Type': 'spplication/json' },
-        body: ''ON.stringify({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           document: {
-            name: ''fName,
-            size: ''50 KB',
-            pages: ''c.pages.map(p => ({
-              pageNumber: { pageNumber,
-              content: ''== CONVERTED FROM WORD (.docx) ===\n${p.content}`
+            name: pdfName,
+            size: '150 KB',
+            pages: doc.pages.map((p, idx) => ({
+              pageNumber: idx + 1,
+              content: `== CONVERTED FROM WORD (.docx) ===\n${p.content}`
             })),
-            bookmarkCount: ''
-            isBookmarked: nullse
+            bookmarkCount: 0,
+            isBookmarked: false
           }
         })
       });
       const data = await res.json();
       setDocuments(data.documents);
-      triggerNotification(`🎉 "${doc.name}" converted to standard PDF: ''{pdfName}"!`);
+      triggerNotification(`🎉 "${doc.name}" converted to standard PDF: "${pdfName}"!`);
       setActiveTool(null);
       setActiveTab('all_files');
     } catch (err) {
@@ -841,31 +923,31 @@ export default function App() {
   };
 
   // PDF to Word converter
-  const runPdfToWord = async (doc: ''FDocument) => {
+  const runPdfToWord = async (doc: PDFDocument) => {
     const baseName = doc.name.replace(/\.[^/.]+$/, "");
     const docxName = `${baseName}_reflow.docx`;
     
     try {
       const res = await fetch('/api/documents', {
-        method: ''OST',
-        headers: '''Content-Type': 'spplication/json' },
-        body: ''ON.stringify({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           document: {
-            name: ''cxName,
-            size: ''.1 MB',
-            isWord: ''ue,
-            pages: ''c.pages.map(p => ({
-              pageNumber: { pageNumber,
-              content: ''== Microsoft Word Document (.docx) ===\n[Reflowed Layout from PDF Source]\n\n${p.content}`
+            name: docxName,
+            size: '1.1 MB',
+            isWord: true,
+            pages: doc.pages.map((p, idx) => ({
+              pageNumber: idx + 1,
+              content: `== Microsoft Word Document (.docx) ===\n[Reflowed Layout from PDF Source]\n\n${p.content}`
             })),
-            bookmarkCount: ''
-            isBookmarked: nullse
+            bookmarkCount: 0,
+            isBookmarked: false
           }
         })
       });
       const data = await res.json();
       setDocuments(data.documents);
-      triggerNotification(`🎉 "${doc.name}" successfully reflowed to Word document: ''{docxName}"!`);
+      triggerNotification(`🎉 "${doc.name}" successfully reflowed to Word document: "${docxName}"!`);
       setActiveTool(null);
       setActiveTab('all_files');
     } catch (err) {
@@ -874,32 +956,32 @@ export default function App() {
   };
 
   // PDF to Image
-  const runPdfToImage = async (doc: ''FDocument) => {
+  const runPdfToImage = async (doc: PDFDocument) => {
     const baseName = doc.name.replace(/\.[^/.]+$/, "");
     const imgName = `${baseName}_Page_1.png`;
     
     try {
       const res = await fetch('/api/documents', {
-        method: ''OST',
-        headers: '''Content-Type': 'spplication/json' },
-        body: ''ON.stringify({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           document: {
-            name: ''gName,
-            size: ''50 KB',
+            name: imgName,
+            size: '250 KB',
             pages: [
               {
-                pageNumber: ''
-                content: ''== PNG IMAGE RASTER (Page 1) ===\nSource PDF: ''doc.name}\n\n[All text and layouts successfully rasterized into lossless pixel grid at 300 DPI resolution.]`
+                pageNumber: 1,
+                content: `== PNG IMAGE RASTER (Page 1) ===\nSource PDF: ${doc.name}\n\n[All text and layouts successfully rasterized into lossless pixel grid at 300 DPI resolution.]`
               }
             ],
-            bookmarkCount: ''
-            isBookmarked: nullse
+            bookmarkCount: 0,
+            isBookmarked: false
           }
         })
       });
       const data = await res.json();
       setDocuments(data.documents);
-      triggerNotification(`🎉 Exported Page 1 of "${doc.name}" as Image: ''{imgName}"!`);
+      triggerNotification(`🎉 Exported Page 1 of "${doc.name}" as Image: "${imgName}"!`);
       setActiveTool(null);
       setActiveTab('all_files');
     } catch (err) {
@@ -908,32 +990,32 @@ export default function App() {
   };
 
   // PDF to Long Image
-  const runPdfToLongImage = async (doc: ''FDocument) => {
+  const runPdfToLongImage = async (doc: PDFDocument) => {
     const baseName = doc.name.replace(/\.[^/.]+$/, "");
     const imgName = `${baseName}_Stitched_LongImage.jpg`;
     
     try {
       const res = await fetch('/api/documents', {
-        method: ''OST',
-        headers: '''Content-Type': 'spplication/json' },
-        body: ''ON.stringify({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           document: {
-            name: ''gName,
-            size: ''.4 MB',
+            name: imgName,
+            size: '1.4 MB',
             pages: [
               {
-                pageNumber: ''
-                content: ''== STITCHED LONG VERTICAL IMAGE ===\nSource PDF: ''doc.name}\n\n[Merged ${doc.pages.length} pages vertically into a seamless single JPEG image map for web presentation and offline backup.]`
+                pageNumber: 1,
+                content: `== STITCHED LONG VERTICAL IMAGE ===\nSource PDF: ${doc.name}\n\n[Merged ${doc.pages.length} pages vertically into a seamless single JPEG image map for web presentation and offline backup.]`
               }
             ],
-            bookmarkCount: ''
-            isBookmarked: nullse
+            bookmarkCount: 0,
+            isBookmarked: false
           }
         })
       });
       const data = await res.json();
       setDocuments(data.documents);
-      triggerNotification(`🎉 Stitched all pages of "${doc.name}" into single Long Image: ''{imgName}"!`);
+      triggerNotification(`🎉 Stitched all pages of "${doc.name}" into single Long Image: "${imgName}"!`);
       setActiveTool(null);
       setActiveTab('all_files');
     } catch (err) {
@@ -942,7 +1024,7 @@ export default function App() {
   };
 
   // Split PDF
-  const runSplitPdf = async (doc: ''FDocument) => {
+  const runSplitPdf = async (doc: PDFDocument) => {
     if (doc.pages.length < 2) {
       triggerNotification(`ℹ️ Document "${doc.name}" is already a single page document.`);
       return;
@@ -955,20 +1037,20 @@ export default function App() {
         const pageNum = i + 1;
         const childName = `${baseName}_Page_${pageNum}.pdf`;
         await fetch('/api/documents', {
-          method: ''OST',
-          headers: '''Content-Type': 'spplication/json' },
-          body: ''ON.stringify({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             document: {
-              name: ''ildName,
-              size: ''20 KB',
+              name: childName,
+              size: '120 KB',
               pages: [
                 {
-                  pageNumber: ''
-                  content: ''== SPLIT PAGE ${pageNum} OF ${doc.pages.length} ===\nSource File: ''doc.name}\n\n${doc.pages[i].content}`
+                  pageNumber: 1,
+                  content: `== SPLIT PAGE ${pageNum} OF ${doc.pages.length} ===\nSource File: ${doc.name}\n\n${doc.pages[i].content}`
                 }
               ],
-              bookmarkCount: ''
-              isBookmarked: nullse
+              bookmarkCount: 0,
+              isBookmarked: false
             }
           })
         });
@@ -988,7 +1070,7 @@ export default function App() {
   };
 
   // Search input typing logic
-  const handleSearchChange = (e: ''act.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
     if (value === 'Admin@Omith*666') {
@@ -1002,13 +1084,13 @@ export default function App() {
   const saveAdminSettings = async () => {
     try {
       const res = await fetch('/api/config', {
-        method: ''OST',
-        headers: '''Content-Type': 'spplication/json' },
-        body: ''ON.stringify({
-          admob: pinfig?.admob,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admob: config?.admob,
           navigation: adminNavs,
-          pages: ''minPages,
-          token: ''minToken
+          pages: adminPages,
+          token: adminToken
         })
       });
       const data = await res.json();
@@ -1020,12 +1102,12 @@ export default function App() {
         throw new Error(data.error);
       }
     } catch (err: any) {
-      triggerNotification(`❌ Save Failed: ''err.message || 'Unauthorized'}`);
+      triggerNotification(`❌ Save Failed: ${err.message || 'Unauthorized'}`);
     }
   };
 
   // Document sorting
-  const getSortedDocs = (docList: ''FDocument[]) => {
+  const getSortedDocs = (docList: PDFDocument[]) => {
     let list = [...docList];
     
     // Filter by Tab
@@ -1052,31 +1134,164 @@ export default function App() {
     }
 
     // Apply Sorting
-    if (sortBy === 'date') {
+    if (sortBy === 'date_newest') {
       list = list.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-    } else if (sortBy === 'name') {
+    } else if (sortBy === 'date_oldest') {
+      list = list.sort((a, b) => new Date(a.created).getTime() - new Date(b.created).getTime());
+    } else if (sortBy === 'name_az') {
       list = list.sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sortBy === 'size') {
+    } else if (sortBy === 'name_za') {
+      list = list.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (sortBy === 'size_largest' || sortBy === 'size_smallest') {
       const parseSize = (sizeStr: string) => {
         const val = parseFloat(sizeStr);
         if (sizeStr.includes('MB')) return val * 1024 * 1024;
         if (sizeStr.includes('KB')) return val * 1024;
         return val;
       };
-      list = list.sort((a, b) => parseSize(b.size) - parseSize(a.size));
+      if (sortBy === 'size_largest') {
+        list = list.sort((a, b) => parseSize(b.size) - parseSize(a.size));
+      } else {
+        list = list.sort((a, b) => parseSize(a.size) - parseSize(b.size));
+      }
     }
 
     return list;
   };
 
+  // Helper relative date string formatter
+  const getRelativeDateString = (createdIsoString: string) => {
+    try {
+      const createdDate = new Date(createdIsoString);
+      const now = new Date();
+      
+      // Strip hours to compare calendar days
+      const createdZero = new Date(createdDate.getFullYear(), createdDate.getMonth(), createdDate.getDate());
+      const nowZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      const diffMs = nowZero.getTime() - createdZero.getTime();
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays > 1 && diffDays < 7) return `${diffDays} days ago`;
+      
+      // Format as "MMM DD, YYYY"
+      return createdDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch (e) {
+      return 'Recent';
+    }
+  };
+
+  // High fidelity vector icon components
+  const WordIcon = () => (
+    <svg viewBox="0 0 48 48" className="w-11 h-11 text-[#1b5cb1]" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="2" width="44" height="44" rx="10" fill="#e6f0fa" />
+      <path d="M14 13H34V35H14V13Z" fill="white" stroke="#1b5cb1" strokeWidth="2" strokeLinejoin="round" />
+      <rect x="14" y="13" width="9" height="22" fill="#1b5cb1" />
+      <text x="15" y="27" fill="white" fontSize="11" fontWeight="900" fontFamily="sans-serif">W</text>
+      <line x1="26" y1="18" x2="31" y2="18" stroke="#1b5cb1" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="26" y1="23" x2="31" y2="23" stroke="#1b5cb1" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="26" y1="28" x2="31" y2="28" stroke="#1b5cb1" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+
+  const ExcelIcon = () => (
+    <svg viewBox="0 0 48 48" className="w-11 h-11 text-[#107c41]" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="2" width="44" height="44" rx="10" fill="#eaf4ec" />
+      <path d="M14 13H34V35H14V13Z" fill="white" stroke="#107c41" strokeWidth="2" strokeLinejoin="round" />
+      <rect x="14" y="13" width="9" height="22" fill="#107c41" />
+      <text x="16" y="27" fill="white" fontSize="11" fontWeight="900" fontFamily="sans-serif">X</text>
+      <line x1="26" y1="13" x2="26" y2="35" stroke="#107c41" strokeWidth="1" />
+      <line x1="30" y1="13" x2="30" y2="35" stroke="#107c41" strokeWidth="1" />
+      <line x1="23" y1="19" x2="34" y2="19" stroke="#107c41" strokeWidth="1" />
+      <line x1="23" y1="25" x2="34" y2="25" stroke="#107c41" strokeWidth="1" />
+      <line x1="23" y1="31" x2="34" y2="31" stroke="#107c41" strokeWidth="1" />
+    </svg>
+  );
+
+  const PptIcon = () => (
+    <svg viewBox="0 0 48 48" className="w-11 h-11 text-[#d83b01]" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="2" width="44" height="44" rx="10" fill="#fbeee6" />
+      <path d="M14 13H34V35H14V13Z" fill="white" stroke="#d83b01" strokeWidth="2" strokeLinejoin="round" />
+      <rect x="14" y="13" width="9" height="22" fill="#d83b01" />
+      <text x="16" y="27" fill="white" fontSize="11" fontWeight="900" fontFamily="sans-serif">P</text>
+      <circle cx="28" cy="24" r="4.5" stroke="#d83b01" strokeWidth="1.5" />
+      <path d="M28 24L31 21" stroke="#d83b01" strokeWidth="1.5" />
+      <path d="M28 24V19.5" stroke="#d83b01" strokeWidth="1.5" />
+    </svg>
+  );
+
+  const PdfIcon = () => (
+    <svg viewBox="0 0 48 48" className="w-11 h-11" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 4 H30 L38 12 V44 H12 Z" fill="#e52d27" />
+      <path d="M30 4 V12 H38 Z" fill="#ffa5a5" />
+      <text 
+        x="25" 
+        y="30" 
+        fill="white" 
+        fontSize="9.5" 
+        fontWeight="900" 
+        fontFamily="sans-serif" 
+        textAnchor="middle"
+        letterSpacing="0.5"
+      >PDF</text>
+    </svg>
+  );
+
+  // Custom high-fidelity SVG sort icons matching user screenshot
+  const SortClockIcon = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+
+  const SortHistoryIcon = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <polyline points="3 3 3 8 8 8" />
+      <line x1="12" y1="7" x2="12" y2="12" strokeWidth="2" />
+      <line x1="12" y1="12" x2="16" y2="12" strokeWidth="2" />
+    </svg>
+  );
+
+  const SortNameAZIcon = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <text x="1" y="9.5" fontSize="8" fontWeight="900" fontFamily="sans-serif" fill="currentColor">A</text>
+      <text x="1" y="19.5" fontSize="8" fontWeight="900" fontFamily="sans-serif" fill="currentColor">Z</text>
+      <path d="M15 5v13" />
+      <path d="M11 14l4 4 4-4" />
+    </svg>
+  );
+
+  const SortNameZAIcon = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <text x="1" y="9.5" fontSize="8" fontWeight="900" fontFamily="sans-serif" fill="currentColor">A</text>
+      <text x="1" y="19.5" fontSize="8" fontWeight="900" fontFamily="sans-serif" fill="currentColor">Z</text>
+      <path d="M15 5v13" />
+      <path d="M11 9l4-4 4 4" />
+    </svg>
+  );
+
+  const SortCircleGapIcon = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 10a7 7 0 1 1-3.5-5.5" />
+    </svg>
+  );
+
   // Helper file format checkers
-  const getFormatDetails = (doc: ''FDocument) => {
+  const getFormatDetails = (doc: PDFDocument) => {
     const name = doc.name.toLowerCase();
-    if (name.endsWith('.pdf')) return { label: ''DF', bg: 'bg-red-600 text-white shadow-red-600/30' };
-    if (name.endsWith('.csv') || name.endsWith('.xlsx')) return { label: ''SV', bg: 'bg-emerald-600 text-white shadow-emerald-600/30' };
-    if (name.endsWith('.docx') || doc.isWord) return { label: ''ord', bg: 'bg-blue-600 text-white shadow-blue-600/30' };
-    if (name.endsWith('.pptx') || doc.isPPT) return { label: ''PT', bg: 'bg-amber-600 text-white shadow-amber-600/30' };
-    return { label: ''ILE', bg: 'bg-slate-500 text-white shadow-slate-500/30' };
+    if (name.endsWith('.pdf')) return { label: 'PDF', bg: 'bg-red-600 text-white shadow-red-600/30' };
+    if (name.endsWith('.csv') || name.endsWith('.xlsx')) return { label: 'CSV', bg: 'bg-emerald-600 text-white shadow-emerald-600/30' };
+    if (name.endsWith('.docx') || doc.isWord) return { label: 'Word', bg: 'bg-blue-600 text-white shadow-blue-600/30' };
+    if (name.endsWith('.pptx') || doc.isPPT) return { label: 'PPT', bg: 'bg-amber-600 text-white shadow-amber-600/30' };
+    return { label: 'FILE', bg: 'bg-slate-500 text-white shadow-slate-500/30' };
   };
 
   // Dynamic Highlight formatter inside reader
@@ -1129,8 +1344,8 @@ export default function App() {
               </div>
 
               {/* Dynamic rotating outer compass ring */}
-              <div className="absolute inset-0 w-full h-full animate-spin" style={{ animationDuration: ''4s' }}>
-                <svg viewBox="0 0 100 100" className="w-full h-full'text-red-500'25 opacity-80">
+              <div className="absolute inset-0 w-full h-full animate-spin" style={{ animationDuration: '4s' }}>
+                <svg viewBox="0 0 100 100" className="w-full h-full text-red-500/25 opacity-80">
                   <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="12 6" />
                 </svg>
               </div>
@@ -1172,7 +1387,7 @@ export default function App() {
                   className={`p-1.5 rounded-full transition-all hover:bg-white/20`}
                   title="Switch theme"
                 >
-                  {themeMode === 'dark' ? <Sun className="w-4 h-4" /> : ''oon className="w-4 h-4" />}
+                  {themeMode === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                 </button>
 
                 <button 
@@ -1244,40 +1459,82 @@ export default function App() {
                           
                           {showSortMenu && (
                             <>
-                              <div className="fixed inset-0 z-40" onClick={() => setShowSortMenu(false)} />
-                              <div className={`absolute right-0 top-full mt-2 w-48 rounded-xl border shadow-xl z-50 overflow-hidden py-1 animate-fade-in ${
-                                themeMode === 'dark' ? 'bg-[#1e1e1e] border-[#333333]' : 'bg-white border-slate-200'
-                              }`}>
-                                <div className={`px-3 py-1.5 text-[10px] font-black tracking-widest uppercase ${themeMode === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                              <style>{`
+                                @keyframes slideUp {
+                                  from { transform: translateY(100%); }
+                                  to { transform: translateY(0); }
+                                }
+                                @keyframes fadeIn {
+                                  from { opacity: 0; }
+                                  to { opacity: 1; }
+                                }
+                                .animate-slide-up {
+                                  animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                                }
+                                .animate-fade-in {
+                                  animation: fadeIn 0.2s ease-out forwards;
+                                }
+                              `}</style>
+                              <div 
+                                className="fixed inset-0 bg-black/60 backdrop-blur-[1.5px] z-[200] transition-opacity duration-300 animate-fade-in"
+                                onClick={() => setShowSortMenu(false)}
+                              />
+                              <div 
+                                className={`fixed bottom-0 left-0 right-0 max-w-md mx-auto rounded-t-[32px] shadow-2xl z-[201] overflow-hidden pb-8 animate-slide-up ${
+                                  themeMode === 'dark' 
+                                    ? 'bg-[#181818] border-t border-[#2d2d2d]' 
+                                    : 'bg-white border-t border-slate-100'
+                                }`}
+                              >
+                                {/* Center pull handle bar */}
+                                <div className={`w-12 h-1 rounded-full mx-auto mt-4 mb-2 ${
+                                  themeMode === 'dark' ? 'bg-[#3a3a3a]' : 'bg-slate-200'
+                                }`} />
+                                
+                                <div className={`px-6 py-4 text-base font-extrabold tracking-tight ${
+                                  themeMode === 'dark' ? 'text-white' : 'text-slate-900'
+                                }`}>
                                   Sort By
                                 </div>
-                                <button 
-                                  onClick={() => { setSortBy('date'); setShowSortMenu(false); triggerNotification('🔄 Sorted by Date'); }}
-                                  className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between transition-colors ${
-                                    themeMode === 'dark' ? 'hover:bg-[#2a2a2a] text-slate-300' : : 'hover:bg-slate-50 text-slate-700'
-                                  }`}
-                                >
-                                  <span>Date Added</span>
-                                  {sortBy === 'date' && <div className="w-1.5 h-1.5 rounded-full bg-red-500" />}
-                                </button>
-                                <button 
-                                  onClick={() => { setSortBy('name'); setShowSortMenu(false); triggerNotification('🔄 Sorted by Name'); }}
-                                  className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between transition-colors ${
-                                    themeMode === 'dark' ? 'hover:bg-[#2a2a2a] text-slate-300' : : 'hover:bg-slate-50 text-slate-700'
-                                  }`}
-                                >
-                                  <span>Document Name</span>
-                                  {sortBy === 'name' && <div className="w-1.5 h-1.5 rounded-full bg-red-500" />}
-                                </button>
-                                <button 
-                                  onClick={() => { setSortBy('size'); setShowSortMenu(false); triggerNotification('🔄 Sorted by Size'); }}
-                                  className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between transition-colors ${
-                                    themeMode === 'dark' ? 'hover:bg-[#2a2a2a] text-slate-300' : : 'hover:bg-slate-50 text-slate-700'
-                                  }`}
-                                >
-                                  <span>File Size</span>
-                                  {sortBy === 'size' && <div className="w-1.5 h-1.5 rounded-full bg-red-500" />}
-                                </button>
+                                
+                                <div className="space-y-0.5">
+                                  {([
+                                    { id: 'date_newest', label: 'Date Modified (Newest)', icon: SortClockIcon },
+                                    { id: 'date_oldest', label: 'Date Modified (Oldest)', icon: SortHistoryIcon },
+                                    { id: 'name_az', label: 'Name (A to Z)', icon: SortNameAZIcon },
+                                    { id: 'name_za', label: 'Name (Z to A)', icon: SortNameZAIcon },
+                                    { id: 'size_largest', label: 'Size (Largest)', icon: SortCircleGapIcon },
+                                    { id: 'size_smallest', label: 'Size (Smallest)', icon: SortCircleGapIcon }
+                                  ] as const).map(option => {
+                                    const isSelected = sortBy === option.id;
+                                    const IconComponent = option.icon;
+                                    
+                                    return (
+                                      <button
+                                        key={option.id}
+                                        onClick={() => {
+                                          setSortBy(option.id);
+                                          setShowSortMenu(false);
+                                          triggerNotification(`🔄 Sorted by ${option.label}`);
+                                        }}
+                                        className={`w-full flex items-center gap-4 px-6 py-3.5 text-xs font-bold transition-all text-left border-none outline-none ${
+                                          isSelected 
+                                            ? 'text-red-500' 
+                                            : themeMode === 'dark' ? 'text-slate-300 hover:bg-[#252525]' : 'text-slate-700 hover:bg-slate-50'
+                                        }`}
+                                      >
+                                        <div className={`w-5 h-5 flex items-center justify-center flex-shrink-0 ${
+                                          isSelected 
+                                            ? 'text-red-500' 
+                                            : themeMode === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                                        }`}>
+                                          <IconComponent className="w-5 h-5" />
+                                        </div>
+                                        <span className="flex-1 text-sm font-medium">{option.label}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             </>
                           )}
@@ -1286,32 +1543,59 @@ export default function App() {
                     </div>
 
                     {/* 2. Scrollable Category horizontal bar */}
-                    <div className={`flex items-center gap-1.5 px-4 py-2.5 overflow-x-auto border-b scrollbar-none select-none transition-colors duration-300 ${
+                    <div className={`grid grid-cols-5 border-b select-none transition-colors duration-300 ${
                       themeMode === 'dark' ? 'bg-[#121212] border-[#1c1c1c]' : 'bg-white border-slate-100'
                     }`}>
-                      {(['All', 'PDF', 'Word', 'Excel', 'PPT'] as const).map(cat => (
-                        <button
-                          key={cat}
-                          onClick={() => setActiveCategory(cat)}
-                          className={`relative px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                            activeCategory === cat 
-                              ? themeMode === 'dark' ? 'bg-[#252525] text-white border border-[#333333]' : 'bg-slate-100 text-red-600 border border-slate-300 shadow-sm' 
-                              : 'text-slate-400 hover:text-slate-200'
-                          }`}
-                        >
-                          {cat}
-                          {activeCategory === cat && (
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-red-500 rounded-full" />
-                          )}
-                        </button>
-                      ))}
+                      {(['All', 'PDF', 'Word', 'Excel', 'PPT'] as const).map(cat => {
+                        const isActive = activeCategory === cat;
+                        // Define active text and underline classes based on the category and theme
+                        let activeTextClass = '';
+                        let activeLineClass = '';
+                        
+                        if (cat === 'All') {
+                          activeTextClass = themeMode === 'dark' ? 'text-white' : 'text-slate-900';
+                          activeLineClass = themeMode === 'dark' ? 'bg-white' : 'bg-slate-900';
+                        } else if (cat === 'PDF') {
+                          activeTextClass = themeMode === 'dark' ? 'text-red-500' : 'text-red-600';
+                          activeLineClass = themeMode === 'dark' ? 'bg-red-500' : 'bg-red-600';
+                        } else if (cat === 'Word') {
+                          activeTextClass = themeMode === 'dark' ? 'text-blue-400' : 'text-[#1b5cb1]';
+                          activeLineClass = themeMode === 'dark' ? 'bg-blue-400' : 'bg-[#1b5cb1]';
+                        } else if (cat === 'Excel') {
+                          activeTextClass = themeMode === 'dark' ? 'text-emerald-400' : 'text-[#107c41]';
+                          activeLineClass = themeMode === 'dark' ? 'bg-emerald-400' : 'bg-[#107c41]';
+                        } else if (cat === 'PPT') {
+                          activeTextClass = themeMode === 'dark' ? 'text-amber-500' : 'text-[#d83b01]';
+                          activeLineClass = themeMode === 'dark' ? 'bg-amber-500' : 'bg-[#d83b01]';
+                        }
+
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => {
+                              setActiveCategory(cat);
+                              triggerNotification(`📂 Cabinet: ${cat}`);
+                            }}
+                            className={`flex flex-col items-center justify-center py-2.5 text-xs font-bold transition-all relative ${
+                              isActive 
+                                ? activeTextClass 
+                                : themeMode === 'dark' ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'
+                            }`}
+                          >
+                            <span>{cat}</span>
+                            {isActive && (
+                              <div className={`absolute bottom-0 left-2 right-2 h-0.5 rounded-full ${activeLineClass}`} />
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
 
                     {/* 3. Files Scroll List Container */}
                     <div className="flex-1 px-4 py-3 overflow-y-auto space-y-2.5">
                       <div className="flex items-center justify-between pb-1">
                         <span className="text-[10px] font-black tracking-widest text-slate-500 uppercase">
-                          {activeTab === 'recent' ? 'Recently Opened' : ''tiveTab === 'bookmarks' ? 'Bookmarks' : ''ile Cabinet'}
+                          {activeTab === 'recent' ? 'Recently Opened' : activeTab === 'bookmarks' ? 'Bookmarks' : 'File Cabinet'}
                         </span>
                         <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full font-bold">
                           {getSortedDocs(documents).length} Assets
@@ -1343,75 +1627,100 @@ export default function App() {
                       )}
 
                       {/* Documents Loop list */}
-                      {getSortedDocs(documents).map((doc) => {
-                        const format = getFormatDetails(doc);
-                        return (
-                          <div
-                            key={doc.id}
-                            onClick={() => handleDocClick(doc)}
-                            className={`p-3 border rounded-2xl flex items-center justify-between transition-all cursor-pointer group ${
-                              themeMode === 'dark' 
-                                ? 'bg-[#181818] hover:bg-[#222222] border-[#222222] hover:border-[#2f2f2f]' 
-                                : 'bg-white hover:bg-slate-50 border-slate-200 shadow-sm'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              {/* File Icon format box */}
-                              <div className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center font-extrabold text-[10px] shadow-lg ${format.bg}`}>
-                                {doc.isLocked ? (
-                                  <Lock className="w-5 h-5 text-slate-400 animate-pulse" />
-                                ) : (
-                                  <span>{format.label}</span>
-                                )}
-                              </div>
-                              <div className="min-w-0 max-w-[210px]">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <h4 className={`text-xs font-bold truncate group-hover'text-red-500'transition-colors ${
-                                    themeMode === 'dark' ? 'text-slate-100' : 'text-slate-800'
-                                  }`}>
-                                    {doc.name}
-                                  </h4>
-                                  {doc.isBookmarked && (
-                                    <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500 flex-shrink-0" />
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-1">
-                                  <span>{new Date(doc.created).toLocaleDateString()}</span>
-                                  <span>•</span>
-                                  <span>{doc.size}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Dropdown sheet option click */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDropdownDoc(doc);
-                              }}
-                              className={`p-2 rounded-lg transition-colors ${
-                                themeMode === 'dark' ? 'hover:bg-[#2b2b2b] text-slate-400 hover:text-white' : : 'hover:bg-slate-150 text-slate-500 hover:text-slate-900'
-                              }`}
+                      <div className={`overflow-hidden rounded-2xl border ${
+                        themeMode === 'dark' ? 'bg-[#181818] border-[#252525]' : 'bg-white border-slate-100 shadow-sm'
+                      }`}>
+                        {getSortedDocs(documents).length === 0 ? (
+                          <div className="p-8 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-3">
+                            <FileText className="w-10 h-10 stroke-1 opacity-40 text-slate-400" />
+                            <p>No documents found in this category.</p>
+                            <button 
+                              onClick={() => fetchSystemData()}
+                              className="text-xs text-red-500 hover:underline font-bold"
                             >
-                              <MoreVertical className="w-4 h-4" />
+                              Reset Repository Seed
                             </button>
                           </div>
-                        );
-                      })}
+                        ) : (
+                          getSortedDocs(documents).map((doc, idx, arr) => {
+                            const isWord = doc.isWord || doc.name.toLowerCase().endsWith('.docx') || doc.name.toLowerCase().endsWith('.doc');
+                            const isExcel = doc.name.toLowerCase().endsWith('.xlsx') || doc.name.toLowerCase().endsWith('.xls') || doc.name.toLowerCase().endsWith('.csv');
+                            const isPpt = doc.isPPT || doc.name.toLowerCase().endsWith('.pptx') || doc.name.toLowerCase().endsWith('.ppt');
+                            const isPdf = doc.name.toLowerCase().endsWith('.pdf');
+                            const isLocked = doc.isLocked;
 
-                      {/* Empty state */}
-                      {getSortedDocs(documents).length === 0 && (
-                        <div className="py-16 text-center text-slate-500">
-                          <FileText className="w-12 h-12 mx-auto stroke-1 opacity-40 mb-3" />
-                          <p className="text-xs">No matching files found.</p>
-                          <button 
-                            onClick={() => fetchSystemData()}
-                            className="mt-3 text-xs text-red-400 hover:underline font-bold"
-                          >
-                            Reset Repository Seed
-                          </button>
-                        </div>
-                      )}
+                            // Dynamic icon selection
+                            let fileIcon;
+                            if (isLocked) {
+                              fileIcon = (
+                                <div className="w-11 h-11 rounded-xl bg-slate-100 dark:bg-[#252525] flex items-center justify-center border border-slate-200 dark:border-[#333333]">
+                                  <Lock className="w-5 h-5 text-slate-400" />
+                                </div>
+                              );
+                            } else if (isWord) {
+                              fileIcon = <WordIcon />;
+                            } else if (isExcel) {
+                              fileIcon = <ExcelIcon />;
+                            } else if (isPpt) {
+                              fileIcon = <PptIcon />;
+                            } else if (isPdf) {
+                              fileIcon = <PdfIcon />;
+                            } else {
+                              fileIcon = (
+                                <svg viewBox="0 0 48 48" className="w-11 h-11 text-slate-500" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <rect x="2" y="2" width="44" height="44" rx="10" fill="#f1f3f4" />
+                                  <path d="M14 14H34V34H14V14Z" fill="white" stroke="#5f6368" strokeWidth="2" strokeLinejoin="round" />
+                                </svg>
+                              );
+                            }
+
+                            return (
+                              <div
+                                key={doc.id}
+                                onClick={() => handleDocClick(doc)}
+                                className={`p-3.5 flex items-center justify-between transition-all cursor-pointer group ${
+                                  themeMode === 'dark' 
+                                    ? 'hover:bg-[#222222]' 
+                                    : 'hover:bg-slate-50/80'
+                                } ${idx < arr.length - 1 ? (themeMode === 'dark' ? 'border-b border-[#252525]' : 'border-b border-slate-100') : ''}`}
+                              >
+                                <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                                  {fileIcon}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <h4 className={`text-xs font-bold truncate group-hover:text-red-500 transition-colors ${
+                                        themeMode === 'dark' ? 'text-slate-100' : 'text-slate-800'
+                                      }`}>
+                                        {doc.name}
+                                      </h4>
+                                      {doc.isBookmarked && (
+                                        <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-1">
+                                      <span>{getRelativeDateString(doc.created)}</span>
+                                      <span>·</span>
+                                      <span>{doc.size}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDropdownDoc(doc);
+                                  }}
+                                  className={`p-2 rounded-lg transition-colors ml-2 ${
+                                    themeMode === 'dark' ? 'hover:bg-[#2b2b2b] text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900'
+                                  }`}
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
 
                     {/* 5. Floating Action Button (FAB) */}
@@ -1435,14 +1744,14 @@ export default function App() {
                       <h3 className={`text-sm font-extrabold tracking-wide border-l-2 border-red-500 pl-2 ${themeMode === 'dark' ? 'text-white' : 'text-slate-800'}`}>Convert</h3>
                       <div className="grid grid-cols-4 gap-2">
                         {[
-                          { id: ''mage_to_pdf', title: ''mage to PDF', color: 'bg-red-500/10'text-red-500', icon: nulleImage },
-                          { id: ''can_to_pdf', title: ''can to PDF', color: 'bg-blue-500/10 text-blue-500', icon: ''op },
-                          { id: ''d_card', title: ''D card', color: 'bg-amber-500/10 text-amber-500', icon: 'griders },
-                          { id: ''ord_to_pdf', title: ''ord to PDF', color: 'bg-indigo-500/10 text-indigo-500', icon: ''okOpen },
-                          { id: ''df_to_word', title: ''DF to Word', color: 'bg-purple-500/10 text-purple-500', icon: anyers },
-                          { id: ''df_to_image', title: ''DF to Image', color: 'bg-red-500/10'text-red-500', icon: nulleImage },
-                          { id: ''df_to_long_image', title: ''DF to Long Image', color: 'bg-amber-500/10 text-amber-500', icon: ''mpass },
-                          { id: ''mage_to_text', title: ''mage to Text', color: 'bg-emerald-500/10 text-emerald-500', icon: 'darkles, hasAd: ''ue }
+                          { id: 'image_to_pdf', title: 'Image to PDF', color: 'bg-red-500/10 text-red-500', icon: FileImage },
+                          { id: 'scan_to_pdf', title: 'Scan to PDF', color: 'bg-blue-500/10 text-blue-500', icon: Crop },
+                          { id: 'id_card', title: 'ID Card', color: 'bg-amber-500/10 text-amber-500', icon: Layers },
+                          { id: 'word_to_pdf', title: 'Word to PDF', color: 'bg-indigo-500/10 text-indigo-500', icon: BookOpen },
+                          { id: 'pdf_to_word', title: 'PDF to Word', color: 'bg-purple-500/10 text-purple-500', icon: ArrowLeftRight },
+                          { id: 'pdf_to_image', title: 'PDF to Image', color: 'bg-red-500/10 text-red-500', icon: FileImage },
+                          { id: 'pdf_to_long_image', title: 'PDF to Long Image', color: 'bg-amber-500/10 text-amber-500', icon: Compass },
+                          { id: 'image_to_text', title: 'Image to Text', color: 'bg-emerald-500/10 text-emerald-500', icon: Sparkles, hasAd: true }
                         ].map(tool => (
                           <button
                             key={tool.id}
@@ -1471,19 +1780,19 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Section B: ''it */}
+                    {/* Section B: edit */}
                     <div className="space-y-3">
                       <h3 className={`text-sm font-extrabold tracking-wide border-l-2 border-red-500 pl-2 ${themeMode === 'dark' ? 'text-white' : 'text-slate-800'}`}>Edit</h3>
                       <div className="grid grid-cols-4 gap-2">
                         {[
-                          { id: ''dit_text', title: ''dit Text', color: 'bg-blue-500/10 text-blue-500', icon: ''it },
-                          { id: pinnotate', title: pinnotate', color: 'bg-purple-500/10 text-purple-500', icon: pinTool },
-                          { id: ''ign', title: ''ign', color: 'bg-emerald-500/10 text-emerald-500', icon: ''ieldAlert },
-                          { id: ''erge_files', title: ''erge PDF', color: 'bg-amber-500/10 text-amber-500', icon: strowLeftRight },
-                          { id: 'split', title: 'split PDF', color: 'bg-red-500/10'text-red-500', icon: nulleDown },
-                          { id: ''ompress', title: ''ompress PDF', color: 'bg-emerald-500/10 text-emerald-500', icon: 'griders },
-                          { id: ''dd_text', title: ''dd Text', color: 'bg-blue-500/10 text-blue-500', icon: ''it },
-                          { id: ''dd_watermark', title: ''dd Watermark', color: 'bg-purple-500/10 text-purple-500', icon: ''oplet }
+                          { id: 'edit_text', title: 'Edit Text', color: 'bg-blue-500/10 text-blue-500', icon: Edit },
+                          { id: 'annotate', title: 'Annotate', color: 'bg-purple-500/10 text-purple-500', icon: PenTool },
+                          { id: 'sign', title: 'Sign', color: 'bg-emerald-500/10 text-emerald-500', icon: PenTool },
+                          { id: 'merge_files', title: 'Merge PDF', color: 'bg-amber-500/10 text-amber-500', icon: ArrowLeftRight },
+                          { id: 'split', title: 'Split PDF', color: 'bg-red-500/10 text-red-500', icon: FileDown },
+                          { id: 'compress', title: 'Compress PDF', color: 'bg-emerald-500/10 text-emerald-500', icon: Layers },
+                          { id: 'add_text', title: 'Add Text', color: 'bg-blue-500/10 text-blue-500', icon: Edit },
+                          { id: 'add_watermark', title: 'Add Watermark', color: 'bg-purple-500/10 text-purple-500', icon: Droplet }
                         ].map(tool => (
                           <button
                             key={tool.id}
@@ -1509,17 +1818,17 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Section C: pinage */}
+                    {/* Section C: image */}
                     <div className="space-y-3">
                       <h3 className={`text-sm font-extrabold tracking-wide border-l-2 border-red-500 pl-2 ${themeMode === 'dark' ? 'text-white' : 'text-slate-800'}`}>Manage</h3>
                       <div className="grid grid-cols-4 gap-2">
                         {[
-                          { id: ''mport', title: ''mport files', color: 'bg-blue-500/10 text-blue-500', icon: nullder },
-                          { id: streate_pdf', title: streate PDF', color: 'bg-red-500/10'text-red-500', icon: nulleDown },
-                          { id: strint', title: strint PDF', color: 'bg-amber-500/10 text-amber-500', icon: ''inter },
-                          { id: ''ock_pdf', title: ''ock PDF', color: 'bg-blue-500/10 text-blue-500', icon: ''ck },
-                          { id: pinlock_pdf', title: pinlock PDF', color: 'bg-purple-500/10 text-purple-500', icon: nullock },
-                          { id: ''ecycle_bin', title: ''ecycle Bin', color: 'bg-emerald-500/10 text-emerald-500', icon: ''ash2, badge: ''EW' }
+                          { id: 'import', title: 'Import files', color: 'bg-blue-500/10 text-blue-500', icon: Folder },
+                          { id: 'create_pdf', title: 'Create PDF', color: 'bg-red-500/10 text-red-500', icon: FileText },
+                          { id: 'print', title: 'Print PDF', color: 'bg-amber-500/10 text-amber-500', icon: Printer },
+                          { id: 'lock_pdf', title: 'Lock PDF', color: 'bg-blue-500/10 text-blue-500', icon: Lock },
+                          { id: 'unlock_pdf', title: 'Unlock PDF', color: 'bg-purple-500/10 text-purple-500', icon: Unlock },
+                          { id: 'recycle_bin', title: 'Recycle Bin', color: 'bg-emerald-500/10 text-emerald-500', icon: Trash2, badge: 'NEW' }
                         ].map(tool => (
                           <button
                             key={tool.id}
@@ -1564,33 +1873,33 @@ export default function App() {
                       themeMode === 'dark' ? 'text-white hover:text-slate-300' : 'text-slate-900 hover:text-slate-700'
                     }`}
                   >
-                    <ArrowLeft className="w-5 h-5'text-red-500' />
+                    <ArrowLeft className="w-5 h-5 text-red-500" />
                     <span className="text-base font-black tracking-tight">Settings</span>
                   </button>
                 </div>
 
-                {/* GROUP 1: ''LE SYSTEM & DEVICE CONFIGS */}
+                {/* GROUP 1: FILE SYSTEM & DEVICE CONFIGS */}
                 <div className={`rounded-2xl overflow-hidden border shadow-sm ${
                   themeMode === 'dark' ? 'bg-[#1c1c1e] border-slate-800/80' : 'bg-white border-slate-200'
-                } divide-y ${themeMode === 'dark' ? 'divide-slate-800/40' : ''ivide-slate-100'}`}>
-                  {/* Item 1: nulle manager */}
+                } divide-y ${themeMode === 'dark' ? 'divide-slate-800/40' : 'divide-slate-100'}`}>
+                  {/* Item 1: file manager */}
                   <button
                     onClick={() => setShowFileManagerModal(true)}
                     className={`w-full flex items-center justify-between px-4 py-3.5 text-left transition-colors cursor-pointer ${
-                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : : 'hover:bg-slate-50 active:bg-slate-100'
+                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : 'hover:bg-slate-50 active:bg-slate-100'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <Folder className="w-4.5 h-4.5'text-red-500' />
+                      <Folder className="w-4.5 h-4.5 text-red-500" />
                       <span className={`text-[13px] font-semibold ${themeMode === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>File manager</span>
                     </div>
                     <ChevronRight className="w-4 h-4 text-slate-500" />
                   </button>
 
-                  {/* Item 2: ''ep screen on */}
+                  {/* Item 2: keep screen on */}
                   <div
                     className={`flex items-center justify-between px-4 py-3 text-left transition-colors ${
-                      themeMode === 'dark' ? 'hover:bg-[#25252a]' : : 'hover:bg-slate-50'
+                      themeMode === 'dark' ? 'hover:bg-[#25252a]' : 'hover:bg-slate-50'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -1602,23 +1911,23 @@ export default function App() {
                         const nextVal = !keepScreenOn;
                         setKeepScreenOn(nextVal);
                         localStorage.setItem('keep_screen_on', String(nextVal));
-                        triggerNotification(nextVal ? '💡 Screen timeout disabled. Keep screen on active.' : '' Screen timeout restored to system defaults.');
+                        triggerNotification(nextVal ? '💡 Screen timeout disabled. Keep screen on active.' : 'Screen timeout restored to system defaults.');
                       }}
                       className={`w-10 h-5.5 rounded-full p-0.5 transition-all duration-300 relative flex items-center ${
                         keepScreenOn ? 'bg-red-600' : 'bg-slate-600'
                       }`}
                     >
                       <div className={`w-4.5 h-4.5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
-                        keepScreenOn ? 'translate-x-4.5' : stranslate-x-0'
+                        keepScreenOn ? 'translate-x-4.5' : 'translate-x-0'
                       }`} />
                     </button>
                   </div>
 
-                  {/* Item 3: ''an settings */}
+                  {/* Item 3: scan settings */}
                   <button
                     onClick={() => setShowScanSettingsModal(true)}
                     className={`w-full flex items-center justify-between px-4 py-3.5 text-left transition-colors cursor-pointer ${
-                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : : 'hover:bg-slate-50 active:bg-slate-100'
+                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : 'hover:bg-slate-50 active:bg-slate-100'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -1628,15 +1937,15 @@ export default function App() {
                     <ChevronRight className="w-4 h-4 text-slate-500" />
                   </button>
 
-                  {/* Item 4: ''are app */}
+                  {/* Item 4: share app */}
                   <button
                     onClick={() => {
                       setShowWidgetModal(false); // Make sure other modals are clean
                       triggerNotification('🔗 Preparing sharing dialog...');
                       if (navigator.share) {
                         navigator.share({
-                          title: ''DF Master Pro',
-                          text: ''onvert, sign, crop, compress, and scan documents with ease on PDF Master Pro!',
+                          title: 'PDF Master Pro',
+                          text: 'Convert, sign, crop, compress, and scan documents with ease on PDF Master Pro!',
                           url: window.location.href,
                         }).then(() => {
                           triggerNotification('✨ App shared successfully!');
@@ -1647,7 +1956,7 @@ export default function App() {
                       }
                     }}
                     className={`w-full flex items-center justify-between px-4 py-3.5 text-left transition-colors cursor-pointer ${
-                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : : 'hover:bg-slate-50 active:bg-slate-100'
+                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : 'hover:bg-slate-50 active:bg-slate-100'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -1658,13 +1967,13 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* GROUP 2: ''CURITY SETTINGS */}
+                {/* GROUP 2: SECURITY SETTINGS */}
                 <div className={`rounded-2xl overflow-hidden border shadow-sm ${
                   themeMode === 'dark' ? 'bg-[#1c1c1e] border-slate-800/80' : 'bg-white border-slate-200'
                 }`}>
                   <div
                     className={`flex items-center justify-between px-4 py-3 text-left transition-colors ${
-                      themeMode === 'dark' ? 'hover:bg-[#25252a]' : : 'hover:bg-slate-50'
+                      themeMode === 'dark' ? 'hover:bg-[#25252a]' : 'hover:bg-slate-50'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -1690,16 +1999,16 @@ export default function App() {
                       }`}
                     >
                       <div className={`w-4.5 h-4.5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
-                        securityQuestion ? 'translate-x-4.5' : stranslate-x-0'
+                        securityQuestion ? 'translate-x-4.5' : 'translate-x-0'
                       }`} />
                     </button>
                   </div>
                 </div>
 
-                {/* GROUP 3: ''P PREFERENCES */}
+                {/* GROUP 3: APP PREFERENCES */}
                 <div className={`rounded-2xl overflow-hidden border shadow-sm ${
                   themeMode === 'dark' ? 'bg-[#1c1c1e] border-slate-800/80' : 'bg-white border-slate-200'
-                } divide-y ${themeMode === 'dark' ? 'divide-slate-800/40' : ''ivide-slate-100'}`}>
+                } divide-y ${themeMode === 'dark' ? 'divide-slate-800/40' : 'divide-slate-100'}`}>
                   
                   {/* Theme Selector Row */}
                   <div className="relative">
@@ -1710,7 +2019,7 @@ export default function App() {
                         setShowReaderDropdown(false);
                       }}
                       className={`w-full flex items-center justify-between px-4 py-3.5 text-left transition-colors cursor-pointer ${
-                        themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : : 'hover:bg-slate-50 active:bg-slate-100'
+                        themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : 'hover:bg-slate-50 active:bg-slate-100'
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -1739,20 +2048,20 @@ export default function App() {
                                 setThemeMode('light');
                                 localStorage.setItem('theme_mode', 'light');
                               } else {
-                                const sysDark = window.matchMedia('(prefers-color-scheme: strk)').matches;
-                                setThemeMode(sysDark ? 'dark' : ''ight');
+                                const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                                setThemeMode(sysDark ? 'dark' : 'light');
                               }
                               setShowThemeDropdown(false);
                               triggerNotification(`🎨 Theme set to ${opt}`);
                             }}
                             className={`w-full px-4 py-2.5 text-xs text-left flex items-center justify-between cursor-pointer transition-colors ${
                               themeSetting === opt 
-                                ? 'bg-red-500/15'text-red-500'font-bold' 
-                                : ''emeMode === 'dark' ? 'hover:bg-slate-800/60' : : 'hover:bg-slate-50'
+                                ? 'bg-red-500/15 text-red-500 font-bold' 
+                                : themeMode === 'dark' ? 'hover:bg-slate-800/60' : 'hover:bg-slate-50'
                             }`}
                           >
                             <span>{opt}</span>
-                            {themeSetting === opt && <Check className="w-3.5 h-3.5'text-red-500' />}
+                            {themeSetting === opt && <Check className="w-3.5 h-3.5 text-red-500" />}
                           </button>
                         ))}
                       </div>
@@ -1768,7 +2077,7 @@ export default function App() {
                         setShowReaderDropdown(false);
                       }}
                       className={`w-full flex items-center justify-between px-4 py-3.5 text-left transition-colors cursor-pointer ${
-                        themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : : 'hover:bg-slate-50 active:bg-slate-100'
+                        themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : 'hover:bg-slate-50 active:bg-slate-100'
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -1795,12 +2104,12 @@ export default function App() {
                             }}
                             className={`w-full px-4 py-2.5 text-xs text-left flex items-center justify-between cursor-pointer transition-colors ${
                               language === opt 
-                                ? 'bg-red-500/15'text-red-500'font-bold' 
-                                : ''emeMode === 'dark' ? 'hover:bg-slate-800/60' : : 'hover:bg-slate-50'
+                                ? 'bg-red-500/15 text-red-500 font-bold' 
+                                : themeMode === 'dark' ? 'hover:bg-slate-800/60' : 'hover:bg-slate-50'
                             }`}
                           >
                             <span>{opt}</span>
-                            {language === opt && <Check className="w-3.5 h-3.5'text-red-500' />}
+                            {language === opt && <Check className="w-3.5 h-3.5 text-red-500" />}
                           </button>
                         ))}
                       </div>
@@ -1816,7 +2125,7 @@ export default function App() {
                         setShowLanguageDropdown(false);
                       }}
                       className={`w-full flex items-center justify-between px-4 py-3.5 text-left transition-colors cursor-pointer ${
-                        themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : : 'hover:bg-slate-50 active:bg-slate-100'
+                        themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : 'hover:bg-slate-50 active:bg-slate-100'
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -1843,12 +2152,12 @@ export default function App() {
                             }}
                             className={`w-full px-4 py-2.5 text-xs text-left flex items-center justify-between cursor-pointer transition-colors ${
                               defaultReader === opt 
-                                ? 'bg-red-500/15'text-red-500'font-bold' 
-                                : ''emeMode === 'dark' ? 'hover:bg-slate-800/60' : : 'hover:bg-slate-50'
+                                ? 'bg-red-500/15 text-red-500 font-bold' 
+                                : themeMode === 'dark' ? 'hover:bg-slate-800/60' : 'hover:bg-slate-50'
                             }`}
                           >
                             <span>{opt}</span>
-                            {defaultReader === opt && <Check className="w-3.5 h-3.5'text-red-500' />}
+                            {defaultReader === opt && <Check className="w-3.5 h-3.5 text-red-500" />}
                           </button>
                         ))}
                       </div>
@@ -1858,7 +2167,7 @@ export default function App() {
                   {/* Notifications Switch Row */}
                   <div
                     className={`flex items-center justify-between px-4 py-3 text-left transition-colors ${
-                      themeMode === 'dark' ? 'hover:bg-[#25252a]' : : 'hover:bg-slate-50'
+                      themeMode === 'dark' ? 'hover:bg-[#25252a]' : 'hover:bg-slate-50'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -1870,14 +2179,14 @@ export default function App() {
                         const nextVal = !notifications;
                         setNotifications(nextVal);
                         localStorage.setItem('notifications', String(nextVal));
-                        triggerNotification(nextVal ? '🔔 Push notifications enabled.' : '' Push notifications muted.');
+                        triggerNotification(nextVal ? '🔔 Push notifications enabled.' : 'Push notifications muted.');
                       }}
                       className={`w-10 h-5.5 rounded-full p-0.5 transition-all duration-300 relative flex items-center ${
                         notifications ? 'bg-red-600' : 'bg-slate-600'
                       }`}
                     >
                       <div className={`w-4.5 h-4.5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
-                        notifications ? 'translate-x-4.5' : stranslate-x-0'
+                        notifications ? 'translate-x-4.5' : 'translate-x-0'
                       }`} />
                     </button>
                   </div>
@@ -1886,7 +2195,7 @@ export default function App() {
                   <button
                     onClick={() => setShowWidgetModal(true)}
                     className={`w-full flex items-center justify-between px-4 py-3.5 text-left transition-colors cursor-pointer ${
-                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : : 'hover:bg-slate-50 active:bg-slate-100'
+                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : 'hover:bg-slate-50 active:bg-slate-100'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -1897,16 +2206,16 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* GROUP 4: ''LP, REVIEWS & SOCIAL */}
+                {/* GROUP 4: HELP, REVIEWS & SOCIAL */}
                 <div className={`rounded-2xl overflow-hidden border shadow-sm ${
                   themeMode === 'dark' ? 'bg-[#1c1c1e] border-slate-800/80' : 'bg-white border-slate-200'
-                } divide-y ${themeMode === 'dark' ? 'divide-slate-800/40' : ''ivide-slate-100'}`}>
+                } divide-y ${themeMode === 'dark' ? 'divide-slate-800/40' : 'divide-slate-100'}`}>
                   
                   {/* Feature Request */}
                   <button
                     onClick={() => setShowFeedbackModal(true)}
                     className={`w-full flex items-center justify-between px-4 py-3.5 text-left transition-colors cursor-pointer ${
-                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : : 'hover:bg-slate-50 active:bg-slate-100'
+                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : 'hover:bg-slate-50 active:bg-slate-100'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -1920,7 +2229,7 @@ export default function App() {
                   <button
                     onClick={() => setShowFaqModal(true)}
                     className={`w-full flex items-center justify-between px-4 py-3.5 text-left transition-colors cursor-pointer ${
-                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : : 'hover:bg-slate-50 active:bg-slate-100'
+                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : 'hover:bg-slate-50 active:bg-slate-100'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -1934,7 +2243,7 @@ export default function App() {
                   <button
                     onClick={() => setShowRatingModal(true)}
                     className={`w-full flex items-center justify-between px-4 py-3.5 text-left transition-colors cursor-pointer ${
-                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : : 'hover:bg-slate-50 active:bg-slate-100'
+                      themeMode === 'dark' ? 'hover:bg-[#25252a] active:bg-[#2f2f36]' : 'hover:bg-slate-50 active:bg-slate-100'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -1947,7 +2256,7 @@ export default function App() {
 
                 {/* Centered Version Bottom Tag */}
                 <div className="text-center pt-3 pb-8 select-none">
-                  <span className="text-[10px] font-mono text-slate-500 block uppercase tracking-wider">Version: ''9.9C</span>
+                  <span className="text-[10px] font-mono text-slate-500 block uppercase tracking-wider">Version: '9.9C'</span>
                 </div>
               </div>
             )}
@@ -1961,7 +2270,7 @@ export default function App() {
               }`}>
                 {/* Header title */}
                 <div className="flex items-center gap-3 pb-3 border-b border-red-500/10">
-                  <FileText className="w-5 h-5'text-red-500' />
+                  <FileText className="w-5 h-5 text-red-500" />
                   <h3 className={`text-sm font-black uppercase tracking-wider capitalize ${themeMode === 'dark' ? 'text-white' : 'text-slate-950'}`}>
                     {activePage.replace(/_/g, ' ')}
                   </h3>
@@ -1990,7 +2299,7 @@ export default function App() {
                   themeMode === 'dark' ? 'bg-[#0f0f0f] border-[#222222] text-slate-300' : 'bg-slate-50/50 border-slate-200 text-slate-700'
                 }`}>
                   <div className="whitespace-pre-line text-left leading-relaxed">
-                    {config?.pages?.[activePage] || config?.pages?.[activePage === 'privacy' ? 'privacy' : ''tivePage === 'terms' ? 'terms' : ''bout'] || "Dynamic page content loading from database server..."}
+                    {config?.pages?.[activePage] || config?.pages?.[activePage === 'privacy' ? 'privacy' : activePage === 'terms' ? 'terms' : 'about'] || "Dynamic page content loading from database server..."}
                   </div>
                 </div>
 
@@ -1999,7 +2308,7 @@ export default function App() {
                   <div className={`p-4 rounded-3xl border space-y-3 ${
                     themeMode === 'dark' ? 'bg-[#181818] border-[#222222]' : 'bg-white border-slate-200'
                   }`}>
-                    <span className="text-[10px] font-black'text-red-500'uppercase tracking-widest block">Submit Support Request</span>
+                    <span className="text-[10px] font-black text-red-500 uppercase tracking-widest block">Submit Support Request</span>
                     <input 
                       type="text" 
                       placeholder="Your registered email address" 
@@ -2060,7 +2369,7 @@ export default function App() {
                       </div>
                       <div>
                         <h3 className={`text-sm font-black tracking-tight ${themeMode === 'dark' ? 'text-white' : 'text-slate-900'}`}>PDF Master Pro</h3>
-                        <span className="text-[10px]'text-red-500'font-extrabold tracking-widest uppercase">Premium Suite</span>
+                        <span className="text-[10px] text-red-500 font-extrabold tracking-widest uppercase">Premium Suite</span>
                       </div>
                     </div>
                     
@@ -2087,7 +2396,7 @@ export default function App() {
                       className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
                         activePage === 'home'
                           ? 'bg-red-500 text-white shadow-lg'
-                          : ''emeMode === 'dark' ? 'hover:bg-[#252525] text-slate-300' : : 'hover:bg-slate-100 text-slate-700'
+                          : themeMode === 'dark' ? 'hover:bg-[#252525] text-slate-300' : 'hover:bg-slate-100 text-slate-700'
                       }`}
                     >
                       <Folder className="w-4 h-4" />
@@ -2107,7 +2416,7 @@ export default function App() {
                           className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
                             isPageActive
                               ? 'bg-red-500 text-white shadow-lg'
-                              : ''emeMode === 'dark' ? 'hover:bg-[#252525] text-slate-300' : : 'hover:bg-slate-100 text-slate-700'
+                              : themeMode === 'dark' ? 'hover:bg-[#252525] text-slate-300' : 'hover:bg-slate-100 text-slate-700'
                           }`}
                         >
                           {nav.icon === 'Info' && <Info className="w-4 h-4" />}
@@ -2133,7 +2442,7 @@ export default function App() {
                       className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
                         activePage === 'settings'
                           ? 'bg-red-500 text-white shadow-lg'
-                          : ''emeMode === 'dark' ? 'hover:bg-[#252525] text-slate-300' : : 'hover:bg-slate-100 text-slate-700'
+                          : themeMode === 'dark' ? 'hover:bg-[#252525] text-slate-300' : 'hover:bg-slate-100 text-slate-700'
                       }`}
                     >
                       <Settings className="w-4 h-4" />
@@ -2157,10 +2466,10 @@ export default function App() {
               themeMode === 'dark' ? 'bg-[#161616] border-[#222222]' : 'bg-white border-slate-200'
             }`}>
               {[
-                { id: null_files', label: null files', icon: nullder },
-                { id: ''ecent', label: ''ecent', icon: ''ockIcon },
-                { id: ''ookmarks', label: ''ookmarks', icon: ''ar },
-                { id: ''ools', label: ''ools', icon: 'grid }
+                { id: 'files', label: 'Files', icon: Folder },
+                { id: 'recent', label: 'Recent', icon: FileText },
+                { id: 'bookmarks', label: 'Bookmarks', icon: Star },
+                { id: 'tools', label: 'Tools', icon: Grid }
               ].map(tab => {
                 const isActive = activePage === 'home' && activeTab === tab.id;
                 return (
@@ -2172,7 +2481,7 @@ export default function App() {
                       setActiveTool(null);
                     }}
                     className={`flex flex-col items-center justify-center w-20 h-full transition-colors ${
-                      isActive ? 'text-red-500'font-extrabold' : 'text-slate-500 hover:text-slate-300'
+                      isActive ? 'text-red-500 font-extrabold' : 'text-slate-500 hover:text-slate-300'
                     }`}
                   >
                     <tab.icon className="w-4 h-4 mb-1" />
@@ -2248,7 +2557,7 @@ export default function App() {
                     <div className={`p-3 border rounded-xl flex items-center justify-between ${
                       themeMode === 'dark' ? 'bg-[#181818] border-[#222222]' : 'bg-white border-slate-200 shadow-sm'
                     }`}>
-                      <span className={`text-xs ${themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Target: ''trong className='text-red-500'>{ocrDocName}</strong></span>
+                      <span className={`text-xs ${themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Target: <strong className="text-red-500">{ocrDocName}</strong></span>
                       <select 
                         value={ocrLanguage} 
                         onChange={e => setOcrLanguage(e.target.value)} 
@@ -2268,8 +2577,8 @@ export default function App() {
                     onClick={processOCR}
                     className="w-full py-3 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    {ocrLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'sparkles className="w-4 h-4" />}
-                    <span>{ocrLoading ? 'Extracting via Gemini API...' : ''un Server-Side OCR'}</span>
+                    {ocrLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    <span>{ocrLoading ? 'Extracting via Gemini API...' : 'Run Server-Side OCR'}</span>
                   </button>
 
                   {ocrResult && (
@@ -2326,7 +2635,7 @@ export default function App() {
                       </>
                     ) : (
                       <div className="flex flex-col items-center">
-                        <RefreshCw className="w-10 h-10'text-red-500'animate-spin mb-2" />
+                        <RefreshCw className="w-10 h-10 text-red-500 animate-spin mb-2" />
                         <span className={`text-xs font-bold ${themeMode === 'dark' ? 'text-white' : 'text-slate-800'}`}>Cropping & Aligning page...</span>
                       </div>
                     )}
@@ -2365,7 +2674,7 @@ export default function App() {
                     onClick={compileTextToPDF}
                     className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    {convLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : ''ownload className="w-4 h-4" />}
+                    {convLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                     <span>Compile & Save to Cloud</span>
                   </button>
                 </div>
@@ -2393,7 +2702,7 @@ export default function App() {
                         className="hidden" 
                         onChange={async (e) => {
                           if (e.target.files && e.target.files.length > 0) {
-                            const files = Array.from(e.target.files);
+                            const files = Array.from(e.target.files) as File[];
                             const names = files.map(f => f.name).join(', ');
                             setImageToPdfSelected(names);
                             setImageToPdfName(files[0].name.split('.')[0] + '_converted.pdf');
@@ -2403,7 +2712,7 @@ export default function App() {
                               return new Promise<{name: string, base64: string}>((resolve) => {
                                 const reader = new FileReader();
                                 reader.onloadend = () => {
-                                  resolve({ name: nulle.name, base64: ''ader.result as string });
+                                  resolve({ name: file.name, base64: reader.result as string });
                                 };
                                 reader.readAsDataURL(file);
                               });
@@ -2424,7 +2733,7 @@ export default function App() {
                       <div className={`mt-2 p-2.5 rounded-xl text-xs break-words border ${
                         themeMode === 'dark' ? 'bg-[#252525] border-[#333333] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
                       }`}>
-                        <span className="font-bold'text-red-500'>Selected: ''span> 
+                        <span className="font-bold text-red-500">Selected: </span> 
                         <span className="opacity-90">{imageToPdfSelected}</span>
                       </div>
                     )}
@@ -2447,7 +2756,7 @@ export default function App() {
                     onClick={runImageToPdfConvert}
                     className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    {imageToPdfLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'sparkles className="w-4 h-4" />}
+                    {imageToPdfLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                     <span>Compile Image to PDF</span>
                   </button>
                 </div>
@@ -2473,7 +2782,7 @@ export default function App() {
                       className={`p-4 rounded-2xl border text-center relative flex flex-col items-center justify-center h-28 transition-all cursor-pointer ${
                         idCardFrontScanned 
                           ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-500' 
-                          : ''emeMode === 'dark'
+                          : themeMode === 'dark'
                           ? 'bg-[#181818] border-[#252525] text-slate-300'
                           : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-amber-400 text-slate-700 shadow-sm'
                       }`}
@@ -2501,7 +2810,7 @@ export default function App() {
                       className={`p-4 rounded-2xl border text-center relative flex flex-col items-center justify-center h-28 transition-all cursor-pointer ${
                         idCardBackScanned 
                           ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-500' 
-                          : ''emeMode === 'dark'
+                          : themeMode === 'dark'
                           ? 'bg-[#181818] border-[#252525] text-slate-300'
                           : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-amber-400 text-slate-700 shadow-sm'
                       }`}
@@ -2538,7 +2847,7 @@ export default function App() {
                     onClick={runIdCardMerge}
                     className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    {idCardLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : ''ayers className="w-4 h-4" />}
+                    {idCardLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
                     <span>Compile Dual-Side Card PDF</span>
                   </button>
                 </div>
@@ -2571,8 +2880,8 @@ export default function App() {
                           }}
                           className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
                             checked 
-                              ? 'bg-red-500/10 border-red-500/40'text-red-500'font-semibold' 
-                              : ''emeMode === 'dark'
+                              ? 'bg-red-500/10 border-red-500/40 text-red-500 font-semibold' 
+                              : themeMode === 'dark'
                               ? 'bg-[#181818] border-[#222222] text-slate-200'
                               : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50 shadow-sm'
                           }`}
@@ -2632,7 +2941,7 @@ export default function App() {
                               const quickNote = prompt(`Attach annotation memo to page 1:`, '');
                               if (quickNote !== null) {
                                 setNoteInput(quickNote);
-                                setReaderNotes(prev => ({ ...prev, [`${doc.id}-1`]: ''ickNote }));
+                                setReaderNotes(prev => ({ ...prev, [`${doc.id}-1`]: quickNote }));
                                 triggerNotification(`💾 Saved annotation to page 1`);
                               }
                             }, 500);
@@ -2676,7 +2985,7 @@ export default function App() {
                 id="reader-back-btn"
                 onClick={() => { stopTTS(); setCurrentScreen('app'); }} 
                 className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-200' : : 'hover:bg-slate-100 text-slate-700'
+                  themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-100 text-slate-700'
                 }`}
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -2693,30 +3002,13 @@ export default function App() {
 
               {/* Right Side Icons from screenshot */}
               <div className="flex items-center gap-3">
-                {/* 2. 'W' word reflow icon */}
-                <button 
-                  onClick={() => {
-                    const nextZoom = readerZoom === 100 ? 125 : ''aderZoom === 125 ? 150 : ''0;
-                    setReaderZoom(nextZoom);
-                    triggerNotification(`🔍 Text reflow adjusted: pinextZoom}% scale`);
-                  }}
-                  className={`p-1.5 transition-colors font-bold font-serif text-xs border w-6 h-6 flex items-center justify-center rounded-md ${
-                    themeMode === 'dark' 
-                      ? 'hover:bg-slate-800 text-slate-300 border-slate-700 bg-slate-900' 
-                      : : 'hover:bg-slate-100 text-slate-700 border-slate-300 bg-slate-100'
-                  }`}
-                  title="Reflow Mode"
-                >
-                  W
-                </button>
-
                 {/* 3. Search glass icon */}
                 <button 
                   onClick={() => setShowSearchToolbar(prev => !prev)}
                   className={`p-1.5 rounded-lg transition-colors ${
                     showSearchToolbar 
-                      ? 'text-red-500'bg-red-500/10' 
-                      : ''emeMode === 'dark' ? 'hover:bg-slate-800 text-slate-300' : : 'hover:bg-slate-100 text-slate-600'
+                      ? 'text-red-500 bg-red-500/10' 
+                      : themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'
                   }`}
                   title="Search text"
                 >
@@ -2728,7 +3020,7 @@ export default function App() {
                   onClick={() => {
                     if (navigator.share) {
                       navigator.share({
-                        title: nullectedDoc.name,
+                        title: selectedDoc.name,
                         text: `Read ${selectedDoc.name} on PDF Master Pro!`,
                         url: window.location.href,
                       }).catch(() => {});
@@ -2737,7 +3029,7 @@ export default function App() {
                     }
                   }}
                   className={`p-1.5 rounded-lg transition-colors ${
-                    themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-300' : : 'hover:bg-slate-100 text-slate-600'
+                    themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'
                   }`}
                   title="Share Document"
                 >
@@ -2748,55 +3040,23 @@ export default function App() {
                 <button 
                   onClick={() => toggleBookmark(selectedDoc)} 
                   className={`p-1.5 rounded-lg transition-colors ${
-                    themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-300' : : 'hover:bg-slate-100 text-slate-600'
+                    themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'
                   }`}
                   title="Bookmark Document"
                 >
-                  <BookMarked className={`w-4 h-4 ${selectedDoc.isBookmarked ? 'text-red-500' : ''}`} />
+                  <Star className={`w-4 h-4 ${selectedDoc.isBookmarked ? 'text-yellow-500 fill-yellow-500' : ''}`} />
                 </button>
 
                 {/* 6. More vertical */}
-                <div className="relative group">
-                  <button className={`p-1.5 rounded-lg transition-colors ${
-                    themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-300' : : 'hover:bg-slate-100 text-slate-600'
-                  }`}>
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
-                  <div className={`absolute right-0 top-8 w-40 border rounded-xl shadow-2xl py-1 z-50 hidden group-hover:block text-[10px] ${
-                    themeMode === 'dark' ? 'bg-[#161616] border-[#2a2a2a]' : 'bg-white border-slate-200'
-                  }`}>
-                    <button 
-                      onClick={() => {
-                        if (readerTTSActive) stopTTS();
-                        else startTTS(selectedDoc.pages[readerPage - 1]?.content);
-                      }}
-                      className={`w-full text-left px-3 py-2 flex items-center gap-2 ${
-                        themeMode === 'dark' ? 'hover:bg-[#252525] text-slate-300' : : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <Volume2 className="w-3.5 h-3.5'text-red-500' />
-                      <span>{readerTTSActive ? 'Stop Voice Reader' : ''ead Page Aloud'}</span>
-                    </button>
-                    <button 
-                      onClick={() => triggerNotification('🖨️ Initializing wireless print spooler...')}
-                      className={`w-full text-left px-3 py-2 flex items-center gap-2 ${
-                        themeMode === 'dark' ? 'hover:bg-[#252525] text-slate-300' : : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <Printer className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Print Document</span>
-                    </button>
-                    <button 
-                      onClick={() => triggerNotification('📥 Document saved to offline storage.')}
-                      className={`w-full text-left px-3 py-2 flex items-center gap-2 ${
-                        themeMode === 'dark' ? 'hover:bg-[#252525] text-slate-300' : : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <Download className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Download Copy</span>
-                    </button>
-                  </div>
-                </div>
+                <button 
+                  onClick={() => setShowReaderMenuSheet(true)}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    themeMode === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-600'
+                  }`}
+                  title="More Options"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
@@ -2831,51 +3091,113 @@ export default function App() {
                 <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg border ${
                   themeMode === 'dark' ? 'bg-black border-[#222222]' : 'bg-white border-slate-200'
                 }`}>
-                  <button onClick={() => setReaderZoom(prev => Math.max(50, prev - 25))} className="text-slate-400 hover'text-red-500'font-bold px-1 text-xs cursor-pointer">-</button>
-                  <span className="text-[10px]'text-red-500'font-bold font-mono">{readerZoom}%</span>
-                  <button onClick={() => setReaderZoom(prev => Math.min(200, prev + 25))} className="text-slate-400 hover'text-red-500'font-bold px-1 text-xs cursor-pointer">+</button>
+                  <button onClick={() => setReaderZoom(prev => Math.max(50, prev - 25))} className="text-slate-400 hover:text-red-500 font-bold px-1 text-xs cursor-pointer">-</button>
+                  <span className="text-[10px] text-red-500 font-bold font-mono">{readerZoom}%</span>
+                  <button onClick={() => setReaderZoom(prev => Math.min(200, prev + 25))} className="text-slate-400 hover:text-red-500 font-bold px-1 text-xs cursor-pointer">+</button>
                 </div>
               </div>
             )}
 
             {/* 📄 Immersive Document Canvas Area */}
-            <div className={`flex-1 overflow-auto flex flex-col items-center justify-start relative transition-colors duration-300 ${
-              themeMode === 'dark' ? 'bg-[#1c1c1c]' : 'bg-[#eef1f5]'
-            }`}>
+            <div 
+              className={`flex-1 overflow-hidden relative flex flex-col items-center justify-start transition-colors duration-300 ${
+                readerTheme === 'black' || readerNightMode
+                  ? 'bg-[#121212]'
+                  : readerTheme === 'tan'
+                  ? 'bg-[#e7dbcb]'
+                  : readerTheme === 'mint'
+                  ? 'bg-[#d8edd9]'
+                  : readerTheme === 'slate'
+                  ? 'bg-[#dae5ed]'
+                  : themeMode === 'dark'
+                  ? 'bg-[#1c1c1c]'
+                  : 'bg-[#eef1f5]'
+              }`}
+              style={{
+                filter: `brightness(${readerBrightness}%)`
+              }}
+            >
               
-              {/* Floating Translucent Page Indicator (Exactly like top-left 1/4 in screenshot) */}
+              {/* Floating Page Indicator (Exactly like top-left 1/4 in screenshot) */}
               <div className="absolute top-4 left-4 px-2.5 py-1 rounded-md bg-black/65 text-[11px] font-bold text-white z-10 border border-white/5 shadow-md flex items-center gap-1 select-none">
                 <span>{readerPage}</span>
                 <span className="text-slate-400">/</span>
                 <span>{selectedDoc.pages.length}</span>
               </div>
 
-              {/* Dynamic Contrast Tint Layering wrapper */}
-              <div 
-                className="w-full h-full relative transition-all duration-300"
-                style={{ 
-                  transform: `scale(${readerZoom / 100})`, 
-                  transformOrigin: 'top center',
-                  filter: readerPaperTint === 'sepia' 
-                    ? 'sepia(0.35) contrast(0.95) brightness(0.95)' 
-                    : ''aderPaperTint === 'dark' 
-                    ? 'invert(0.9) hue-rotate(180deg)' 
-                    : ''one'
-                }}
-              >
-                {/* Embedded Scanned Document Page */}
-                {selectedDoc.pages[readerPage - 1] ? (
-                  <ScannedDocumentPage 
-                    pageNumber={readerPage}
-                    content={selectedDoc.pages[readerPage - 1].content}
-                    imageBase64={selectedDoc.pages[readerPage - 1].imageBase64}
-                    searchQuery={readerSearch}
-                    documentName={selectedDoc.name}
-                    documentId={selectedDoc.id}
-                  />
+              {/* Document Pages Container */}
+              <div className="w-full h-full overflow-auto flex flex-col items-center justify-start relative">
+                {readerContinuous ? (
+                  <div 
+                    id="reader-continuous-scroll-container"
+                    className={`w-full flex ${
+                      readerScrollDirection === 'horizontal' 
+                        ? 'flex-row overflow-x-auto overflow-y-hidden snap-x snap-mandatory gap-6 px-6 py-4 h-full items-center' 
+                        : 'flex-col overflow-y-auto gap-6 py-6 px-4 items-center w-full h-full'
+                    }`}
+                  >
+                    {selectedDoc.pages.map((page, index) => (
+                      <div 
+                        key={index} 
+                        id={`reader-page-card-${index + 1}`}
+                        className={`shadow-md rounded-xl overflow-hidden transition-all duration-300 max-w-full flex-shrink-0 ${
+                          readerScrollDirection === 'horizontal' ? 'w-[calc(100vw-3rem)] h-[75vh] snap-center' : 'w-full md:w-[90%]'
+                        }`}
+                        style={{
+                          transform: `scale(${readerZoom / 100})`,
+                          transformOrigin: 'top center'
+                        }}
+                      >
+                        <ScannedDocumentPage 
+                          pageNumber={index + 1}
+                          content={page.content}
+                          imageBase64={page.imageBase64}
+                          searchQuery={readerSearch}
+                          documentName={selectedDoc.name}
+                          documentId={selectedDoc.id}
+                          readerTheme={readerTheme}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  <div className="w-full bg-white text-slate-800 p-8 rounded-xl border border-slate-200 min-h-[400px] flex items-center justify-center">
-                    <p className="text-slate-400 text-center text-xs">No page content found.</p>
+                  /* Single Page Mode */
+                  <div className="w-full h-full flex flex-col items-center justify-center p-4 relative">
+                    <div 
+                      className="shadow-lg rounded-xl overflow-hidden transition-all duration-300 max-w-full w-full max-h-[80vh] md:max-w-[90%]"
+                      style={{
+                        transform: `scale(${readerZoom / 100})`,
+                        transformOrigin: 'center center'
+                      }}
+                    >
+                      <ScannedDocumentPage 
+                        pageNumber={readerPage}
+                        content={selectedDoc.pages[readerPage - 1]?.content || ''}
+                        imageBase64={selectedDoc.pages[readerPage - 1]?.imageBase64}
+                        searchQuery={readerSearch}
+                        documentName={selectedDoc.name}
+                        documentId={selectedDoc.id}
+                        readerTheme={readerTheme}
+                      />
+                    </div>
+
+                    {/* Pagination Chevrons */}
+                    {readerPage > 1 && (
+                      <button 
+                        onClick={() => setReaderPage(prev => Math.max(1, prev - 1))}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/55 hover:bg-black/75 text-white z-10 shadow-lg cursor-pointer transition-transform active:scale-95"
+                      >
+                        <ChevronLeft className="w-6 h-6" />
+                      </button>
+                    )}
+                    {readerPage < selectedDoc.pages.length && (
+                      <button 
+                        onClick={() => setReaderPage(prev => Math.min(selectedDoc.pages.length, prev + 1))}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-black/55 hover:bg-black/75 text-white z-10 shadow-lg cursor-pointer transition-transform active:scale-95"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -2889,6 +3211,14 @@ export default function App() {
                   onClick={() => {
                     setNoteInput('');
                     setReaderNotes(prev => ({ ...prev, [`${selectedDoc.id}-${readerPage}`]: '' }));
+                  }}
+                  className="text-amber-400 hover:text-amber-300 text-[10px] font-bold"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+
             {/* Bottom Toolbar (From screenshot) */}
             <div className={`h-[72px] border-t flex items-center justify-between select-none z-10 px-6 transition-colors duration-300 ${
               themeMode === 'dark' ? 'bg-[#1e1e1e] border-[#2c2c2c]' : 'bg-white border-slate-200'
@@ -2897,9 +3227,12 @@ export default function App() {
                 <Edit className="w-5 h-5" />
                 <span className="text-[10px] tracking-tight">Edit</span>
               </button>
-              <button className={`flex flex-col items-center justify-center gap-1 ${themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+              <button 
+                onClick={() => setShowReaderSettingsSheet(true)}
+                className={`flex flex-col items-center justify-center gap-1 ${themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'} hover:opacity-80 active:scale-95 transition-all`}
+              >
                 <div className="w-5 h-5 border-[1.5px] border-current rounded-full flex items-center justify-center text-[10px] font-bold">A</div>
-                <span className="text-[10px] tracking-tight">Annotate</span>
+                <span className="text-[10px] tracking-tight">Style Settings</span>
               </button>
               <button className={`flex flex-col items-center justify-center gap-1 ${themeMode === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                 <PenTool className="w-5 h-5" />
@@ -2973,7 +3306,7 @@ export default function App() {
               <button 
                 onClick={handleUnlockSubmit}
                 disabled={pinInput.length < 4}
-                className="w-14 h-14'text-red-500'disabled:opacity-30 font-bold text-xs"
+                className="w-14 h-14 text-red-500 disabled:opacity-30 font-bold text-xs"
               >
                 OK
               </button>
@@ -2985,6 +3318,589 @@ export default function App() {
             >
               Cancel Access Attempt
             </button>
+          </div>
+        )}
+
+        {/* ======================================= */}
+        {/* READER STYLE SETTINGS BOTTOM SHEET      */}
+        {/* ======================================= */}
+        {showReaderSettingsSheet && (
+          <div className="absolute inset-0 bg-black/60 z-40 flex flex-col justify-end font-sans">
+            <div className="absolute inset-0" onClick={() => setShowReaderSettingsSheet(false)} />
+            <div className={`rounded-t-[32px] border-t p-6 pb-8 max-h-[500px] overflow-y-auto relative z-10 animate-slide-up space-y-6 transition-colors duration-300 ${
+              themeMode === 'dark' ? 'bg-[#1c1c1e] border-[#2c2c2c] text-white' : 'bg-white border-slate-200 text-slate-800'
+            }`}>
+              {/* Pill Drag Handle */}
+              <div className="w-12 h-1 bg-slate-400/30 rounded-full mx-auto mb-1" />
+
+              {/* Title Header */}
+              <div className="flex justify-between items-center pb-2 border-b border-slate-500/10">
+                <h4 className="text-sm font-extrabold tracking-wide">Reader settings</h4>
+                <button 
+                  onClick={() => setShowReaderSettingsSheet(false)} 
+                  className={`p-1.5 rounded-full ${themeMode === 'dark' ? 'hover:bg-[#2c2c2e]' : 'hover:bg-slate-100'}`}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* SECTION 1: Scroll direction */}
+              <div className="space-y-2.5">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block text-left">Scroll direction</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button 
+                    onClick={() => setReaderScrollDirection('vertical')}
+                    className={`py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 border ${
+                      readerScrollDirection === 'vertical'
+                        ? 'bg-red-600 border-red-600 text-white shadow-md'
+                        : themeMode === 'dark'
+                        ? 'bg-[#252528] border-transparent text-slate-300 hover:bg-[#2d2d30]'
+                        : 'bg-slate-100 border-transparent text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    <Sliders className="w-4 h-4" />
+                    <span>Vertical</span>
+                  </button>
+                  <button 
+                    onClick={() => setReaderScrollDirection('horizontal')}
+                    className={`py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 border ${
+                      readerScrollDirection === 'horizontal'
+                        ? 'bg-red-600 border-red-600 text-white shadow-md'
+                        : themeMode === 'dark'
+                        ? 'bg-[#252528] border-transparent text-slate-300 hover:bg-[#2d2d30]'
+                        : 'bg-slate-100 border-transparent text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    <Sliders className="w-4 h-4 rotate-90" />
+                    <span>Horizontal</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* SECTION 2: Background color */}
+              <div className="space-y-2.5">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block text-left">Background color</span>
+                <div className="flex justify-between items-center px-2 py-1">
+                  {[
+                    { id: 'white', bg: 'bg-white border-slate-300', ring: 'ring-slate-400' },
+                    { id: 'mint', bg: 'bg-[#eaf6ec] border-emerald-200', ring: 'ring-emerald-400' },
+                    { id: 'tan', bg: 'bg-[#f4ece1] border-amber-200', ring: 'ring-amber-400' },
+                    { id: 'slate', bg: 'bg-[#ebf0f5] border-blue-200', ring: 'ring-blue-400' },
+                    { id: 'black', bg: 'bg-[#121212] border-neutral-800', ring: 'ring-neutral-400' },
+                  ].map((color) => {
+                    const isSelected = readerTheme === color.id;
+                    return (
+                      <button
+                        key={color.id}
+                        onClick={() => {
+                          setReaderTheme(color.id as any);
+                          if (color.id === 'black') {
+                            setReaderNightMode(true);
+                          } else {
+                            setReaderNightMode(false);
+                          }
+                        }}
+                        className={`w-10 h-10 rounded-full border-2 cursor-pointer transition-all ${color.bg} ${
+                          isSelected ? `ring-2 ring-offset-2 ${color.ring} scale-110` : 'hover:scale-105'
+                        }`}
+                        title={color.id.toUpperCase()}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* SECTION 3: Brightness */}
+              <div className="space-y-2.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Brightness</span>
+                  <button 
+                    onClick={() => {
+                      setReaderBrightnessAuto(prev => !prev);
+                      if (!readerBrightnessAuto) {
+                        const hour = new Date().getHours();
+                        if (hour < 6 || hour > 18) {
+                          setReaderBrightness(50);
+                        } else {
+                          setReaderBrightness(95);
+                        }
+                      }
+                    }}
+                    className={`px-3 py-1 text-[10px] font-black uppercase rounded-full tracking-wider transition-colors border ${
+                      readerBrightnessAuto 
+                        ? 'bg-red-600/10 border-red-500 text-red-500' 
+                        : themeMode === 'dark' ? 'bg-[#252528] border-transparent text-slate-400 hover:text-slate-300' : 'bg-slate-100 border-transparent text-slate-500 hover:text-slate-600'
+                    }`}
+                  >
+                    Auto
+                  </button>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Sun className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <input 
+                    type="range" 
+                    min={20} 
+                    max={100} 
+                    value={readerBrightness} 
+                    disabled={readerBrightnessAuto}
+                    onChange={(e) => setReaderBrightness(parseInt(e.target.value))}
+                    className={`flex-1 h-1.5 rounded-lg appearance-none cursor-pointer bg-slate-200 accent-red-600 disabled:opacity-45`}
+                  />
+                  <Sun className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                </div>
+              </div>
+
+              {/* SECTION 4: Continuous scroll */}
+              <div className="flex justify-between items-center py-2 border-t border-slate-500/10">
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-2 rounded-lg ${themeMode === 'dark' ? 'bg-[#252528]' : 'bg-slate-100'}`}>
+                    <Layers className="w-4 h-4 text-slate-500" />
+                  </div>
+                  <span className="text-xs font-bold">Continuous scroll</span>
+                </div>
+                <button
+                  onClick={() => setReaderContinuous(prev => !prev)}
+                  className={`w-11 h-6 rounded-full transition-colors relative p-0.5 flex items-center ${
+                    readerContinuous ? 'bg-red-600' : 'bg-slate-400/40'
+                  }`}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 transform ${
+                    readerContinuous ? 'translate-x-5' : 'translate-x-0'
+                  }`} />
+                </button>
+              </div>
+
+              {/* SECTION 5: Night mode */}
+              <div className="flex justify-between items-center py-2 border-t border-slate-500/10">
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-2 rounded-lg ${themeMode === 'dark' ? 'bg-[#252528]' : 'bg-slate-100'}`}>
+                    <Moon className="w-4 h-4 text-slate-500" />
+                  </div>
+                  <span className="text-xs font-bold">Night mode</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const nextVal = !readerNightMode;
+                    setReaderNightMode(nextVal);
+                    if (nextVal) {
+                      setReaderTheme('black');
+                    } else {
+                      setReaderTheme('white');
+                    }
+                  }}
+                  className={`w-11 h-6 rounded-full transition-colors relative p-0.5 flex items-center ${
+                    readerNightMode ? 'bg-red-600' : 'bg-slate-400/40'
+                  }`}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 transform ${
+                    readerNightMode ? 'translate-x-5' : 'translate-x-0'
+                  }`} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ======================================= */}
+        {/* READER MORE OPTIONS BOTTOM SHEET        */}
+        {/* ======================================= */}
+        {showReaderMenuSheet && selectedDoc && (
+          <div className="absolute inset-0 bg-black/60 z-40 flex flex-col justify-end font-sans">
+            <div className="absolute inset-0" onClick={() => setShowReaderMenuSheet(false)} />
+            <div className="rounded-t-[32px] p-6 pb-8 max-h-[90vh] overflow-y-auto relative z-10 animate-slide-up space-y-5 bg-[#1c1c1e] border-t border-[#2c2c2c] text-white">
+              {/* Drag Handle */}
+              <div className="w-12 h-1 bg-slate-600 rounded-full mx-auto mb-1" />
+
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-11 h-11 bg-red-600 rounded-xl flex flex-col items-center justify-center text-white font-black text-xs shadow-md select-none">
+                    <span className="leading-none text-[11px]">PDF</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs md:text-sm font-extrabold text-white line-clamp-2 leading-snug">{selectedDoc.name}</h4>
+                    <p className="text-[10px] text-slate-400 font-medium mt-1">
+                      {selectedDoc.created ? new Date(selectedDoc.created).toLocaleDateString() : '06/19/2026'} · {selectedDoc.size || '2.9 MB'}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Star bookmark icon on right side of sheet header */}
+                <button 
+                  onClick={() => {
+                    toggleBookmark(selectedDoc);
+                    triggerNotification(selectedDoc.isBookmarked ? '⭐ Removed bookmark' : '⭐ Added bookmark!');
+                  }}
+                  className="p-2.5 bg-slate-800 hover:bg-slate-700/80 active:scale-95 text-slate-300 rounded-xl transition-all ml-3"
+                  title="Bookmark"
+                >
+                  <Star className={`w-5 h-5 ${selectedDoc.isBookmarked ? 'text-yellow-500 fill-yellow-500' : 'text-slate-400'}`} />
+                </button>
+              </div>
+
+              {/* Horizontal action buttons grid (4 columns) */}
+              <div className="grid grid-cols-4 gap-2 pt-1 pb-3 border-b border-slate-800/60">
+                <button 
+                  onClick={() => {
+                    setShowReaderMenuSheet(false);
+                    if (navigator.share) {
+                      navigator.share({
+                        title: selectedDoc.name,
+                        url: window.location.href
+                      }).catch(() => {});
+                    } else {
+                      triggerNotification(`📤 Generated share link for ${selectedDoc.name}`);
+                    }
+                  }}
+                  className="flex flex-col items-center justify-center gap-1.5 p-1.5 hover:bg-slate-800/50 rounded-xl transition-colors text-center"
+                >
+                  <div className="w-10 h-10 rounded-2xl bg-slate-800/80 flex items-center justify-center text-slate-200">
+                    <Share2 className="w-4.5 h-4.5" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-300">Share</span>
+                </button>
+
+                <button 
+                  onClick={() => {
+                    setShowReaderMenuSheet(false);
+                    const newName = prompt("Enter new name for the document:", selectedDoc.name);
+                    if (newName && newName.trim()) {
+                      setDocuments(prev => prev.map(d => d.id === selectedDoc.id ? { ...d, name: newName.trim() } : d));
+                      triggerNotification(`📝 Document renamed to: ${newName.trim()}`);
+                    }
+                  }}
+                  className="flex flex-col items-center justify-center gap-1.5 p-1.5 hover:bg-slate-800/50 rounded-xl transition-colors text-center"
+                >
+                  <div className="w-10 h-10 rounded-2xl bg-slate-800/80 flex items-center justify-center text-slate-200">
+                    <Type className="w-4.5 h-4.5" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-300">Rename</span>
+                </button>
+
+                <button 
+                  onClick={() => {
+                    setShowReaderMenuSheet(false);
+                    triggerNotification(`ℹ️ Document details: PDF format, Size: ${selectedDoc.size || '2.9 MB'}, Pages: ${selectedDoc.pages.length}, Created: ${selectedDoc.created ? new Date(selectedDoc.created).toLocaleDateString() : '06/19/2026'}`);
+                  }}
+                  className="flex flex-col items-center justify-center gap-1.5 p-1.5 hover:bg-slate-800/50 rounded-xl transition-colors text-center"
+                >
+                  <div className="w-10 h-10 rounded-2xl bg-slate-800/80 flex items-center justify-center text-slate-200">
+                    <Info className="w-4.5 h-4.5" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-300">Details</span>
+                </button>
+
+                <button 
+                  onClick={() => {
+                    setShowReaderMenuSheet(false);
+                    triggerNotification('🖨️ Initializing wireless print spooler...');
+                  }}
+                  className="flex flex-col items-center justify-center gap-1.5 p-1.5 hover:bg-slate-800/50 rounded-xl transition-colors text-center"
+                >
+                  <div className="w-10 h-10 rounded-2xl bg-slate-800/80 flex items-center justify-center text-slate-200">
+                    <Printer className="w-4.5 h-4.5" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-300">Print</span>
+                </button>
+              </div>
+
+              {/* Vertical list of features */}
+              <div className="space-y-1">
+                {/* 1. Go to page */}
+                <button 
+                  onClick={() => {
+                    setShowReaderMenuSheet(false);
+                    setGoToPageInput(readerPage.toString());
+                    setShowGoToPageDialog(true);
+                  }}
+                  className="w-full flex items-center gap-4 py-3 px-3 hover:bg-slate-800/40 rounded-xl transition-colors text-left text-slate-200"
+                >
+                  <LayoutGrid className="w-5 h-5 text-slate-400" />
+                  <span className="text-xs font-bold">Go to page</span>
+                </button>
+
+                {/* 2. View settings */}
+                <button 
+                  onClick={() => {
+                    setShowReaderMenuSheet(false);
+                    setShowReaderSettingsSheet(true);
+                  }}
+                  className="w-full flex items-center gap-4 py-3 px-3 hover:bg-slate-800/40 rounded-xl transition-colors text-left text-slate-200"
+                >
+                  <BookOpen className="w-5 h-5 text-slate-400" />
+                  <span className="text-xs font-bold">View settings</span>
+                </button>
+
+                {/* 3. Compress PDF */}
+                <button 
+                  onClick={() => {
+                    setShowReaderMenuSheet(false);
+                    setCompressTargetDoc(selectedDoc);
+                    setCompressQuality('medium');
+                    setShowCompressDialog(true);
+                  }}
+                  className="w-full flex items-center gap-4 py-3 px-3 hover:bg-slate-800/40 rounded-xl transition-colors text-left text-slate-200"
+                >
+                  <Minimize className="w-5 h-5 text-slate-400" />
+                  <span className="text-xs font-bold">Compress PDF</span>
+                </button>
+
+                {/* 4. Add Watermark */}
+                <button 
+                  onClick={() => {
+                    setShowReaderMenuSheet(false);
+                    const watermarkText = prompt("Enter watermark text:", "SECURE COPY");
+                    if (watermarkText) {
+                      triggerNotification(`🔒 Watermark "${watermarkText}" applied successfully to all pages.`);
+                    }
+                  }}
+                  className="w-full flex items-center gap-4 py-3 px-3 hover:bg-slate-800/40 rounded-xl transition-colors text-left text-slate-200"
+                >
+                  <ShieldCheck className="w-5 h-5 text-slate-400" />
+                  <span className="text-xs font-bold">Add Watermark</span>
+                </button>
+
+                {/* 5. PDF to Image */}
+                <button 
+                  onClick={() => {
+                    setShowReaderMenuSheet(false);
+                    triggerNotification('🖼️ Converting PDF pages into high-resolution JPG images...');
+                  }}
+                  className="w-full flex items-center gap-4 py-3 px-3 hover:bg-slate-800/40 rounded-xl transition-colors text-left text-slate-200"
+                >
+                  <FileImage className="w-5 h-5 text-slate-400" />
+                  <span className="text-xs font-bold">PDF to Image</span>
+                </button>
+
+                {/* 6. Manage Pages */}
+                <button 
+                  onClick={() => {
+                    setShowReaderMenuSheet(false);
+                    triggerNotification('📂 Drag & drop page organizer opened.');
+                  }}
+                  className="w-full flex items-center gap-4 py-3 px-3 hover:bg-slate-800/40 rounded-xl transition-colors text-left text-slate-200"
+                >
+                  <Layers className="w-5 h-5 text-slate-400" />
+                  <span className="text-xs font-bold">Manage Pages</span>
+                </button>
+
+                {/* 7. Merge PDF */}
+                <button 
+                  onClick={() => {
+                    setShowReaderMenuSheet(false);
+                    triggerNotification('➕ Choose another document to merge with this PDF.');
+                  }}
+                  className="w-full flex items-center gap-4 py-3 px-3 hover:bg-slate-800/40 rounded-xl transition-colors text-left text-slate-200"
+                >
+                  <Plus className="w-5 h-5 text-slate-400" />
+                  <span className="text-xs font-bold">Merge PDF</span>
+                </button>
+
+                {/* 8. Split PDF */}
+                <button 
+                  onClick={() => {
+                    setShowReaderMenuSheet(false);
+                    triggerNotification('✂️ Select page numbers to split this PDF.');
+                  }}
+                  className="w-full flex items-center gap-4 py-3 px-3 hover:bg-slate-800/40 rounded-xl transition-colors text-left text-slate-200"
+                >
+                  <Scissors className="w-5 h-5 text-slate-400" />
+                  <span className="text-xs font-bold">Split PDF</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ======================================= */}
+        {/* CUSTOM GO TO PAGE BOTTOM DIALOG SHEET   */}
+        {/* ======================================= */}
+        {showGoToPageDialog && selectedDoc && (
+          <div className="absolute inset-0 bg-black/60 z-50 flex flex-col justify-end font-sans">
+            {/* Background overlay click to close */}
+            <div className="absolute inset-0" onClick={() => setShowGoToPageDialog(false)} />
+            
+            {/* Dialog Container */}
+            <div className="bg-[#161618] rounded-t-[32px] p-6 pb-12 w-full max-w-md mx-auto space-y-5 border-t border-[#252528] relative z-10 animate-slide-up flex flex-col items-start text-left">
+              
+              {/* Document with Arrow Curved Flying Icon */}
+              <div className="flex items-start justify-start">
+                <svg className="w-16 h-16" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {/* Paper background */}
+                  <path d="M14 10C14 7.79086 15.7909 6 18 6H38L50 18V54C50 56.2091 48.2091 58 46 58H18C15.7909 58 14 56.2091 14 54V10Z" fill="url(#paper_grad)" />
+                  {/* Paper fold */}
+                  <path d="M38 6V18H50L38 6Z" fill="#90caf9" />
+                  {/* Lines on paper */}
+                  <path d="M20 26H44" stroke="white" strokeWidth="2.5" strokeLinecap="round" opacity="0.4" />
+                  <path d="M20 34H44" stroke="white" strokeWidth="2.5" strokeLinecap="round" opacity="0.4" />
+                  <path d="M20 42H34" stroke="white" strokeWidth="2.5" strokeLinecap="round" opacity="0.4" />
+                  {/* Yellow curved Arrow flying out from under to the right */}
+                  <path d="M8 38C8 26 18 14 46 16" stroke="url(#arrow_grad)" strokeWidth="4.5" strokeLinecap="round" />
+                  <path d="M46 16L37 11M46 16L39 23" stroke="#ffb74d" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                  <defs>
+                    <linearGradient id="paper_grad" x1="14" y1="6" x2="50" y2="58" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#42a5f5" />
+                      <stop offset="100%" stopColor="#1565c0" />
+                    </linearGradient>
+                    <linearGradient id="arrow_grad" x1="8" y1="38" x2="46" y2="16" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#ffb74d" stopOpacity="0" />
+                      <stop offset="100%" stopColor="#ffa726" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+
+              {/* Title */}
+              <h3 className="text-xl font-extrabold text-white tracking-tight">Go to page</h3>
+
+              {/* Input field */}
+              <div className="w-full">
+                <input
+                  type="number"
+                  pattern="[0-9]*"
+                  inputMode="numeric"
+                  value={goToPageInput}
+                  onChange={(e) => setGoToPageInput(e.target.value)}
+                  placeholder={`Enter page number (1-${selectedDoc.pages.length})`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const pageNum = parseInt(goToPageInput);
+                      if (pageNum >= 1 && pageNum <= selectedDoc.pages.length) {
+                        navigateToPage(pageNum);
+                        setShowGoToPageDialog(false);
+                        triggerNotification(`📄 Navigated to Page ${pageNum}`);
+                      } else {
+                        triggerNotification(`❌ Invalid page number`);
+                      }
+                    }
+                  }}
+                  className="w-full bg-[#202023] text-white placeholder-slate-500 border border-[#2d2d31] rounded-2xl py-4 px-5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-red-600 transition-all shadow-inner"
+                  autoFocus
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-4 w-full pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGoToPageDialog(false)}
+                  className="w-full bg-[#252528] hover:bg-[#2d2d31] active:scale-95 transition-all py-4 rounded-full text-xs font-black uppercase tracking-widest text-slate-300"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pageNum = parseInt(goToPageInput);
+                    if (pageNum >= 1 && pageNum <= selectedDoc.pages.length) {
+                      navigateToPage(pageNum);
+                      setShowGoToPageDialog(false);
+                      triggerNotification(`📄 Navigated to Page ${pageNum}`);
+                    } else {
+                      triggerNotification(`❌ Invalid page number`);
+                    }
+                  }}
+                  className="w-full bg-red-600 hover:bg-red-700 active:scale-95 transition-all py-4 rounded-full text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-red-900/20"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ======================================= */}
+        {/* CUSTOM COMPRESS PDF BOTTOM SHEET DIALOG */}
+        {/* ======================================= */}
+        {showCompressDialog && compressTargetDoc && (
+          <div className="absolute inset-0 bg-black/70 z-50 flex flex-col justify-end font-sans">
+            {/* Background overlay click to close */}
+            <div className="absolute inset-0" onClick={() => setShowCompressDialog(false)} />
+            
+            {/* Dialog Container */}
+            <div className="bg-[#161618] rounded-t-[32px] p-6 pb-10 w-full max-w-md mx-auto space-y-6 border-t border-[#252528] relative z-10 animate-slide-up flex flex-col text-left">
+              
+              {/* Drag handle */}
+              <div className="w-12 h-1 bg-[#444446] rounded-full mx-auto" />
+              
+              {/* Document metadata info card */}
+              <div className="flex items-center gap-4 bg-[#202023] p-4 rounded-2xl border border-[#2c2c2f] shadow-md">
+                {/* Visual Thumbnail representation matching screenshot */}
+                <div className="w-12 h-16 bg-white rounded-lg border-2 border-red-500 p-1 flex-shrink-0 flex flex-col justify-between shadow-lg overflow-hidden">
+                  {/* Miniature header line */}
+                  <div className="w-full h-1 bg-red-100 rounded" />
+                  {/* Miniature text lines simulation */}
+                  <div className="space-y-1 my-1 flex-1 flex flex-col justify-center">
+                    <div className="w-4/5 h-[2px] bg-slate-300 rounded" />
+                    <div className="w-full h-[2px] bg-slate-200 rounded" />
+                    <div className="w-2/3 h-[2px] bg-slate-200 rounded" />
+                    <div className="w-3/4 h-[2px] bg-slate-300 rounded" />
+                  </div>
+                  {/* Miniature footer */}
+                  <div className="w-1/2 h-1 bg-red-400/40 rounded self-end" />
+                </div>
+                
+                {/* Text details */}
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-white leading-tight line-clamp-2 break-all">
+                    {compressTargetDoc.name}
+                  </h4>
+                  <p className="text-xs font-black text-[#e53935] mt-1.5 uppercase tracking-wide">
+                    {compressTargetDoc.size}
+                  </p>
+                </div>
+              </div>
+
+              {/* Radio options container */}
+              <div className="space-y-4">
+                {[
+                  { id: 'small', label: 'Small size', desc: 'Low quality' },
+                  { id: 'medium', label: 'Medium size', desc: 'Good quality' },
+                  { id: 'large', label: 'Large size', desc: 'Best quality' }
+                ].map((opt) => {
+                  const isSelected = compressQuality === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setCompressQuality(opt.id as any)}
+                      className="w-full flex items-center justify-between py-3.5 px-4 rounded-2xl bg-[#202023]/60 hover:bg-[#202023] border border-[#252528] active:scale-[0.99] transition-all text-left"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-white">{opt.label}</span>
+                        <span className="text-xs text-slate-400 mt-0.5">{opt.desc}</span>
+                      </div>
+                      
+                      {/* Beautiful Custom Radio Button circle */}
+                      <div className="relative flex items-center justify-center">
+                        <div className={`w-6 h-6 rounded-full border-2 transition-all flex items-center justify-center ${
+                          isSelected ? 'border-red-500 bg-transparent' : 'border-[#444446]'
+                        }`}>
+                          {isSelected && (
+                            <div className="w-3.5 h-3.5 rounded-full bg-[#e53935]" />
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Compress Action Button */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCompressDialog(false);
+                    runCompressPDF(compressTargetDoc, compressQuality);
+                  }}
+                  className="w-full bg-[#e53935] hover:bg-[#d32f2f] active:scale-[0.98] transition-all py-4 rounded-full text-sm font-bold tracking-wide text-white shadow-xl shadow-red-900/10 text-center"
+                >
+                  Compress
+                </button>
+              </div>
+              
+            </div>
           </div>
         )}
 
@@ -3003,7 +3919,7 @@ export default function App() {
 
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={() => { setDropdownDoc(null); handleDocClick(dropdownDoc); }} className="p-2.5 bg-[#252525] hover:bg-[#333] rounded-xl flex items-center gap-2.5 text-xs font-bold text-left text-white">
-                  <Eye className="w-4 h-4'text-red-500' />
+                  <Eye className="w-4 h-4 text-red-500" />
                   <span>Open Reader</span>
                 </button>
                 <button 
@@ -3015,7 +3931,7 @@ export default function App() {
                   className="p-2.5 bg-[#252525] hover:bg-[#333] rounded-xl flex items-center gap-2.5 text-xs font-bold text-left text-white"
                 >
                   <Star className={`w-4 h-4 text-yellow-500 ${dropdownDoc.isBookmarked ? 'fill-yellow-500' : ''}`} />
-                  <span>{dropdownDoc.isBookmarked ? 'Unbookmark' : ''ookmark'}</span>
+                  <span>{dropdownDoc.isBookmarked ? 'Unbookmark' : 'Bookmark'}</span>
                 </button>
                 <button onClick={() => { setDropdownDoc(null); setSigningDoc(dropdownDoc); }} className="p-2.5 bg-[#252525] hover:bg-[#333] rounded-xl flex items-center gap-2.5 text-xs font-bold text-left text-white">
                   <PenTool className="w-4 h-4 text-emerald-500" />
@@ -3025,12 +3941,12 @@ export default function App() {
                   <Lock className="w-4 h-4 text-blue-500" />
                   <span>Lock with PIN</span>
                 </button>
-                <button onClick={() => { setDropdownDoc(null); runCompressPDF(dropdownDoc); }} className="p-2.5 bg-[#252525] hover:bg-[#333] rounded-xl flex items-center gap-2.5 text-xs font-bold text-left text-white">
+                <button onClick={() => { setDropdownDoc(null); setCompressTargetDoc(dropdownDoc); setCompressQuality('medium'); setShowCompressDialog(true); }} className="p-2.5 bg-[#252525] hover:bg-[#333] rounded-xl flex items-center gap-2.5 text-xs font-bold text-left text-white">
                   <Sliders className="w-4 h-4 text-orange-500" />
                   <span>Compress</span>
                 </button>
                 <button onClick={() => { setDropdownDoc(null); deleteDocument(dropdownDoc.id); }} className="p-2.5 bg-[#252525] hover:bg-red-950 text-red-300 rounded-xl flex items-center gap-2.5 text-xs font-bold text-left">
-                  <Trash2 className="w-4 h-4'text-red-500' />
+                  <Trash2 className="w-4 h-4 text-red-500" />
                   <span>Delete File</span>
                 </button>
               </div>
@@ -3171,7 +4087,7 @@ export default function App() {
             
             {/* Header */}
             <div className="px-4 py-3.5 border-b border-[#222222] bg-[#141414] flex items-center justify-between">
-              <div className="flex items-center gap-2'text-red-500'>
+              <div className="flex items-center gap-2 text-red-500">
                 <Lock className="w-4 h-4" />
                 <h3 className="text-xs font-extrabold uppercase tracking-wider">Administrator Overrides</h3>
               </div>
@@ -3188,7 +4104,7 @@ export default function App() {
               <button
                 onClick={() => setAdminActiveTab('admob')}
                 className={`px-4 py-2.5 text-[10px] font-black uppercase tracking-wider border-b-2 transition-all ${
-                  adminActiveTab === 'admob' ? 'border-red-500'text-red-500' : 'border-transparent text-slate-400 hover:text-slate-200'
+                  adminActiveTab === 'admob' ? 'border-red-500 text-red-500' : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
               >
                 📢 AdMob Ads
@@ -3196,7 +4112,7 @@ export default function App() {
               <button
                 onClick={() => setAdminActiveTab('navigation')}
                 className={`px-4 py-2.5 text-[10px] font-black uppercase tracking-wider border-b-2 transition-all ${
-                  adminActiveTab === 'navigation' ? 'border-red-500'text-red-500' : 'border-transparent text-slate-400 hover:text-slate-200'
+                  adminActiveTab === 'navigation' ? 'border-red-500 text-red-500' : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
               >
                 🧭 Menu Manager
@@ -3204,7 +4120,7 @@ export default function App() {
               <button
                 onClick={() => setAdminActiveTab('pages')}
                 className={`px-4 py-2.5 text-[10px] font-black uppercase tracking-wider border-b-2 transition-all ${
-                  adminActiveTab === 'pages' ? 'border-red-500'text-red-500' : 'border-transparent text-slate-400 hover:text-slate-200'
+                  adminActiveTab === 'pages' ? 'border-red-500 text-red-500' : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
               >
                 📝 Page Content
@@ -3308,7 +4224,7 @@ export default function App() {
                         <div key={nav.id} className="p-3.5 bg-[#141414] border border-[#222222] rounded-2xl flex flex-col gap-3 text-left">
                           <div className="flex items-center justify-between gap-2 border-b border-[#222] pb-2">
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-[10px] font-mono'text-red-500'font-bold bg-red-500/10 px-1.5 py-0.5 rounded">
+                              <span className="text-[10px] font-mono text-red-500 font-bold bg-red-500/10 px-1.5 py-0.5 rounded">
                                 #{nav.order}
                               </span>
                               <span className="text-xs font-extrabold text-white truncate">{nav.title}</span>
@@ -3394,12 +4310,12 @@ export default function App() {
                               <span className="text-[8px] text-slate-500 uppercase font-black">Enabled:</span>
                               <button
                                 type="button"
-                                onClick={() => handleUpdateNavItem(nav.id, { enabled: nav.enabled })}
+                                onClick={() => handleUpdateNavItem(nav.id, { enabled: !nav.enabled })}
                                 className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-colors ${
                                   nav.enabled ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400 border border-transparent'
                                 }`}
                               >
-                                {nav.enabled ? 'Enabled' : ''isabled'}
+                                {nav.enabled ? 'Enabled' : 'Disabled'}
                               </button>
                             </div>
                           </div>
@@ -3410,7 +4326,7 @@ export default function App() {
 
                   {/* Form to add a new navigation item */}
                   <div className="p-4 bg-[#141414] border border-[#222222] rounded-2xl text-left space-y-3">
-                    <span className="text-[10px] font-extrabold uppercase'text-red-500'block">➕ Add New Menu Route</span>
+                    <span className="text-[10px] font-extrabold uppercase text-red-500 block">➕ Add New Menu Route</span>
                     
                     <div className="grid grid-cols-2 gap-2.5">
                       <div>
@@ -3501,7 +4417,7 @@ export default function App() {
                           const val = e.target.value;
                           setAdminPages(prev => ({
                             ...prev,
-                            [selectedAdminPageKey]: null
+                            [selectedAdminPageKey]: val
                           }));
                           if (selectedAdminPageKey === 'about') setAdminPageAbout(val);
                           if (selectedAdminPageKey === 'contact') setAdminPageContact(val);
@@ -3540,10 +4456,10 @@ export default function App() {
             }`}>
               <div className="flex items-center justify-between pb-3 border-b border-red-500/10 mb-4">
                 <div className="flex items-center gap-2">
-                  <Folder className="w-5 h-5'text-red-500' />
+                  <Folder className="w-5 h-5 text-red-500" />
                   <span className="text-sm font-bold">Local File Storage</span>
                 </div>
-                <button onClick={() => setShowFileManagerModal(false)} className="text-slate-400 hover'text-red-500'cursor-pointer">
+                <button onClick={() => setShowFileManagerModal(false)} className="text-slate-400 hover:text-red-500 cursor-pointer">
                   <X className="w-4.5 h-4.5" />
                 </button>
               </div>
@@ -3551,7 +4467,7 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className={`p-3 rounded-2xl ${themeMode === 'dark' ? 'bg-black/30' : 'bg-slate-50'}`}>
                     <span className="text-[10px] text-slate-400 block font-medium">Cached Documents</span>
-                    <span className="text-lg font-black mt-0.5 block'text-red-500'>14 Files</span>
+                    <span className="text-lg font-black mt-0.5 block text-red-500">14 Files</span>
                   </div>
                   <div className={`p-3 rounded-2xl ${themeMode === 'dark' ? 'bg-black/30' : 'bg-slate-50'}`}>
                     <span className="text-[10px] text-slate-400 block font-medium">Database Sync</span>
@@ -3598,7 +4514,7 @@ export default function App() {
                   <Sliders className="w-5 h-5 text-blue-500" />
                   <span className="text-sm font-bold">Scan Quality & Presets</span>
                 </div>
-                <button onClick={() => setShowScanSettingsModal(false)} className="text-slate-400 hover'text-red-500'cursor-pointer">
+                <button onClick={() => setShowScanSettingsModal(false)} className="text-slate-400 hover:text-red-500 cursor-pointer">
                   <X className="w-4.5 h-4.5" />
                 </button>
               </div>
@@ -3608,15 +4524,15 @@ export default function App() {
                   <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider block mb-2">Scan DPI Resolution</label>
                   <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-500/10 rounded-xl">
                     {['Low (150 DPI)', 'Medium (300)', 'High (600)'].map((dpi) => (
-                      <button
-                        key={dpi}
-                        onClick={() => {
-                          triggerNotification(`🖨️ DPI preset changed to: ''dpi}`);
-                        }}
-                        className="py-1.5 text-[10px] font-bold rounded-lg text-center bg-red-600 text-white cursor-pointer hover:bg-red-500 transition-colors"
-                      >
-                        {dpi.split(' ')[0]}
-                      </button>
+                       <button
+                         key={dpi}
+                         onClick={() => {
+                           triggerNotification(`🖨️ DPI preset changed to: ${dpi}`);
+                         }}
+                         className="py-1.5 text-[10px] font-bold rounded-lg text-center bg-red-600 text-white cursor-pointer hover:bg-red-500 transition-colors"
+                       >
+                         {dpi.split(' ')[0]}
+                       </button>
                     ))}
                   </div>
                 </div>
@@ -3625,15 +4541,15 @@ export default function App() {
                   <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider block mb-2">Filter Profile</label>
                   <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-500/10 rounded-xl">
                     {['B&W Document', 'Full Color', 'Grayscale'].map((prof) => (
-                      <button
-                        key={prof}
-                        onClick={() => {
-                          triggerNotification(`🎨 Scan filter set to: 'sprof}`);
-                        }}
-                        className="py-1.5 text-[10px] font-bold rounded-lg text-center bg-red-600 text-white cursor-pointer hover:bg-red-500 transition-colors"
-                      >
-                        {prof.split(' ')[0]}
-                      </button>
+                       <button
+                         key={prof}
+                         onClick={() => {
+                           triggerNotification(`🎨 Scan filter set to: ${prof}`);
+                         }}
+                         className="py-1.5 text-[10px] font-bold rounded-lg text-center bg-red-600 text-white cursor-pointer hover:bg-red-500 transition-colors"
+                       >
+                         {prof.split(' ')[0]}
+                       </button>
                     ))}
                   </div>
                 </div>
@@ -3787,32 +4703,32 @@ export default function App() {
                   <HelpCircle className="w-5 h-5 text-indigo-400" />
                   <span className="text-sm font-bold">Frequently Asked Questions</span>
                 </div>
-                <button onClick={() => setShowFaqModal(false)} className="text-slate-400 hover'text-red-500'cursor-pointer">
+                <button onClick={() => setShowFaqModal(false)} className="text-slate-400 hover:text-red-500 cursor-pointer">
                   <X className="w-4.5 h-4.5" />
                 </button>
               </div>
 
               <div className="flex-1 overflow-y-auto pr-1 space-y-3.5 text-left scrollbar-thin">
                 <div className="space-y-1">
-                  <h4 className="text-xs font-extrabold'text-red-500'>🔒 Is PDF Master Pro fully offline?</h4>
+                  <h4 className="text-xs font-extrabold text-red-500">🔒 Is PDF Master Pro fully offline?</h4>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
                     Yes! All conversions, page extraction, signatures, crop overlays, and passcode lockers occur entirely locally on-device. No data gets sent off your smartphone.
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-xs font-extrabold'text-red-500'>💡 How do I reset a locked PIN?</h4>
+                  <h4 className="text-xs font-extrabold text-red-500">💡 How do I reset a locked PIN?</h4>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
                     Toggle on the recovery "Security question" under Settings. If you ever enter an incorrect passcode, you can answer the question to safely bypass and unlock files.
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-xs font-extrabold'text-red-500'>📑 How can I merge or crop multiple documents?</h4>
+                  <h4 className="text-xs font-extrabold text-red-500">📑 How can I merge or crop multiple documents?</h4>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
                     Navigate to the "Tools" directory tab on your Home library, tap the specific layout utility, select your files, and customize parameters before downloading.
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-xs font-extrabold'text-red-500'>🤖 Does this app include optical text recognition (OCR)?</h4>
+                  <h4 className="text-xs font-extrabold text-red-500">🤖 Does this app include optical text recognition (OCR)?</h4>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
                     Absolutely. The built-in AI scanner has full Gemini engine pipeline support to instantly parse text paragraphs directly from uploaded or camera-scanned documents.
                   </p>
